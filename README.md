@@ -1,2 +1,2 @@
-# diffy
-DiFFY - The modern git diffing tool
+# DiFFY
+The modern git diffing tool
