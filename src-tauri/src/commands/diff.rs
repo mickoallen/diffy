@@ -48,6 +48,12 @@ pub fn get_workdir_file_diff(path: String, file_path: String) -> Result<FileDiff
 }
 
 #[tauri::command]
+pub fn get_file_content(path: String, ref_name: String, file_path: String) -> Result<Vec<String>, String> {
+    let repository = repo::open_repo(&path)?;
+    diff::get_file_content(&repository, &ref_name, &file_path)
+}
+
+#[tauri::command]
 pub fn get_local_vs_remote(path: String) -> Result<(DiffSummary, String, String), String> {
     let repository = repo::open_repo(&path)?;
     let (files, upstream, branch) = diff::diff_local_vs_remote(&repository)?;

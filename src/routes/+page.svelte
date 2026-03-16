@@ -1,6 +1,8 @@
 <script lang="ts">
-	import { onMount } from 'svelte';
+	import { onMount, onDestroy } from 'svelte';
 	import { open } from '@tauri-apps/plugin-dialog';
+	import { invoke } from '@tauri-apps/api/core';
+	import { listen, type UnlistenFn } from '@tauri-apps/api/event';
 	import { repoStore } from '$lib/stores/repo.svelte';
 	import { diffStore } from '$lib/stores/diff.svelte';
 	import { settingsStore } from '$lib/stores/settings.svelte';
@@ -14,12 +16,47 @@
 
 	let repoPath = $state('');
 	let repoOpened = $state(false);
+	let unlistenRefresh: UnlistenFn | undefined;
+
+	let cleanupKeyboard: (() => void) | undefined;
 
 	onMount(() => {
 		document.documentElement.setAttribute('data-theme', settingsStore.theme);
-		const cleanup = setupKeyboardShortcuts();
-		return cleanup;
+		cleanupKeyboard = setupKeyboardShortcuts();
+
+		listen<{ kind: string }>('git://refresh', async (event) => {
+			if (!repoOpened || diffStore.loading) return;
+			const { kind } = event.payload;
+			if (kind === 'git-state') {
+				await repoStore.refreshBranches();
+				await reloadCurrentDiff();
+			} else if (kind === 'workdir') {
+				if (diffStore.compareMode === 'workdir' || diffStore.compareMode === 'local-vs-remote') {
+					await reloadCurrentDiff();
+				}
+			}
+		}).then((fn) => { unlistenRefresh = fn; });
 	});
+
+	onDestroy(() => {
+		cleanupKeyboard?.();
+		unlistenRefresh?.();
+		if (repoOpened) {
+			invoke('stop_watching').catch(() => {});
+		}
+	});
+
+	async function reloadCurrentDiff() {
+		if (diffStore.compareMode === 'workdir') {
+			await diffStore.loadWorkdirDiff();
+		} else if (diffStore.compareMode === 'local-vs-remote') {
+			await diffStore.loadLocalVsRemote();
+		} else if (diffStore.compareMode === 'branch-vs-branch') {
+			if (diffStore.fromRef && diffStore.toRef) {
+				await diffStore.loadBranchDiff(diffStore.fromRef, diffStore.toRef);
+			}
+		}
+	}
 
 	async function handleOpenRepo(path?: string) {
 		const target = (path ?? repoPath).trim();
@@ -29,6 +66,7 @@
 		if (!repoStore.error) {
 			recentsStore.add(target);
 			repoOpened = true;
+			invoke('start_watching', { path: target }).catch(() => {});
 			// Try workdir first (most useful on open), fall back to vs-remote
 			await diffStore.loadWorkdirDiff();
 			if (!diffStore.error && diffStore.summary?.files.length === 0) {

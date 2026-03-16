@@ -106,3 +106,11 @@ export async function listRepoFiles(path: string): Promise<string[]> {
 export async function readRepoFile(path: string, filePath: string): Promise<string> {
 	return invoke('read_repo_file', { path, filePath });
 }
+
+export async function getFileContent(
+	path: string,
+	refName: string,
+	filePath: string
+): Promise<string[]> {
+	return invoke('get_file_content', { path, refName, filePath });
+}

@@ -13,7 +13,7 @@ import {
 import { repoStore } from './repo.svelte';
 
 export type CompareMode = 'local-vs-remote' | 'branch-vs-branch' | 'workdir';
-export type ViewMode = 'unified' | 'split';
+export type ViewMode = 'unified' | 'split' | 'full';
 export type TreeMode = 'diffs' | 'all';
 
 class DiffStore {
@@ -157,7 +157,9 @@ class DiffStore {
 	}
 
 	toggleViewMode() {
-		this.viewMode = this.viewMode === 'unified' ? 'split' : 'unified';
+		if (this.viewMode === 'unified') this.viewMode = 'split';
+		else if (this.viewMode === 'split') this.viewMode = 'full';
+		else this.viewMode = 'unified';
 	}
 }
 

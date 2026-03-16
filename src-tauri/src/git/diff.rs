@@ -124,6 +124,27 @@ pub fn diff_local_vs_remote(repo: &Repository) -> Result<(Vec<FileSummary>, Stri
     Ok((summaries, upstream_name, branch_name))
 }
 
+pub fn get_file_content(repo: &Repository, ref_name: &str, file_path: &str) -> Result<Vec<String>, String> {
+    let obj = repo
+        .revparse_single(ref_name)
+        .map_err(|e| format!("Failed to resolve '{}': {}", ref_name, e))?;
+    let tree = obj
+        .peel_to_tree()
+        .map_err(|e| format!("Failed to peel to tree: {}", e))?;
+    let entry = tree
+        .get_path(std::path::Path::new(file_path))
+        .map_err(|_| format!("File '{}' not found at '{}'", file_path, ref_name))?;
+    let blob = repo
+        .find_blob(entry.id())
+        .map_err(|e| format!("Failed to get blob: {}", e))?;
+    if blob.is_binary() {
+        return Ok(vec![]);
+    }
+    let content = std::str::from_utf8(blob.content())
+        .map_err(|_| "File is not valid UTF-8".to_string())?;
+    Ok(content.lines().map(|l| l.to_string()).collect())
+}
+
 fn resolve_tree<'a>(repo: &'a Repository, refname: &str) -> Result<git2::Tree<'a>, String> {
     repo.revparse_single(refname)
         .and_then(|obj| obj.peel_to_tree())

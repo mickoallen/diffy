@@ -20,6 +20,13 @@
 			>
 				Split
 			</button>
+			<button
+				class="toggle-btn"
+				class:active={diffStore.viewMode === 'full'}
+				onclick={() => (diffStore.viewMode = 'full')}
+			>
+				Full File
+			</button>
 			<span class="shortcut-hint">s</span>
 		</div>
 	</div>

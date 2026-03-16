@@ -4,6 +4,7 @@
 	import { settingsStore } from '$lib/stores/settings.svelte';
 	import UnifiedDiff from './UnifiedDiff.svelte';
 	import SplitDiff from './SplitDiff.svelte';
+	import FullFileDiff from './FullFileDiff.svelte';
 
 	function handleExplainHunk(content: string) {
 		settingsStore.showAiPanel = true;
@@ -31,8 +32,10 @@
 	{:else if diffStore.fileDiff}
 		{#if diffStore.viewMode === 'unified'}
 			<UnifiedDiff file={diffStore.fileDiff} onExplainHunk={handleExplainHunk} />
-		{:else}
+		{:else if diffStore.viewMode === 'split'}
 			<SplitDiff file={diffStore.fileDiff} onExplainHunk={handleExplainHunk} />
+		{:else}
+			<FullFileDiff file={diffStore.fileDiff} />
 		{/if}
 	{:else if diffStore.error}
 		<div class="error">{diffStore.error}</div>
