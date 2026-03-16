@@ -15,7 +15,7 @@ A desktop app for reviewing git diffs with AI-powered explanations. Compare bran
 
 ## Prerequisites
 
-- [Rust toolchain](https://rustup.rs/) (stable)
+- [Rust toolchain](https://rustup.rs/) (stable) — install with `curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh`
 - [Node.js](https://nodejs.org/) 18+
 - A [Claude API key](https://console.anthropic.com/) (set via Settings in the app)
 
