@@ -122,13 +122,17 @@
 						if (selected) handleOpenRepo(selected);
 					}}>Browse</button>
 				</div>
-				<button type="submit" class="open-btn">Open Repository</button>
+				<button type="submit" class="open-btn" disabled={repoStore.loading}>
+				{#if repoStore.loading}
+					<div class="btn-spinner"></div>
+					Opening…
+				{:else}
+					Open Repository
+				{/if}
+			</button>
 			</form>
 			{#if repoStore.error}
 				<div class="error">{repoStore.error}</div>
-			{/if}
-			{#if repoStore.loading}
-				<div class="loading">Opening...</div>
 			{/if}
 			{#if recentsStore.repos.length > 0}
 				<div class="recents">
@@ -136,11 +140,14 @@
 					<ul class="recents-list">
 						{#each recentsStore.repos as repo (repo.path)}
 							<li class="recents-item">
-								<button class="recents-open" onclick={() => handleOpenRepo(repo.path)}>
+								<button class="recents-open" onclick={() => handleOpenRepo(repo.path)} disabled={repoStore.loading}>
+									{#if repoStore.loading && repoPath === repo.path}
+										<div class="recents-spinner"></div>
+									{/if}
 									<span class="recents-name">{repo.name}</span>
 									<span class="recents-path">{repo.path}</span>
 								</button>
-								<button class="recents-remove" onclick={() => recentsStore.remove(repo.path)} title="Remove">×</button>
+								<button class="recents-remove" onclick={() => recentsStore.remove(repo.path)} title="Remove" disabled={repoStore.loading}>×</button>
 							</li>
 						{/each}
 					</ul>
@@ -206,6 +213,12 @@
 			<MainPanel />
 			{#if settingsStore.showAiPanel}
 				<AiPanel />
+			{/if}
+			{#if diffStore.loading}
+				<div class="loading-overlay">
+					<div class="spinner"></div>
+					<span>Loading diff…</span>
+				</div>
 			{/if}
 		</div>
 
@@ -363,9 +376,26 @@
 		font-size: 1rem;
 		font-weight: 600;
 		cursor: pointer;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		gap: 8px;
 	}
-	.open-btn:hover {
+	.open-btn:hover:not(:disabled) {
 		opacity: 0.9;
+	}
+	.open-btn:disabled {
+		opacity: 0.7;
+		cursor: default;
+	}
+	.btn-spinner {
+		width: 14px;
+		height: 14px;
+		border: 2px solid rgba(255,255,255,0.4);
+		border-top-color: white;
+		border-radius: 50%;
+		animation: spin 0.7s linear infinite;
+		flex-shrink: 0;
 	}
 	.error {
 		margin-top: 12px;
@@ -449,13 +479,23 @@
 	.recents-item:hover .recents-remove {
 		opacity: 1;
 	}
+	.recents-open:disabled,
+	.recents-remove:disabled {
+		opacity: 0.5;
+		cursor: default;
+	}
+	.recents-spinner {
+		width: 12px;
+		height: 12px;
+		border: 1.5px solid var(--border);
+		border-top-color: var(--color-accent);
+		border-radius: 50%;
+		animation: spin 0.7s linear infinite;
+		flex-shrink: 0;
+	}
 	.recents-remove:hover {
 		color: var(--text-primary);
 		background: var(--bg-secondary);
-	}
-	.loading {
-		margin-top: 12px;
-		color: var(--text-muted);
 	}
 
 	.app {
@@ -570,6 +610,31 @@
 		flex: 1;
 		display: flex;
 		overflow: hidden;
+		position: relative;
+	}
+	.loading-overlay {
+		position: absolute;
+		inset: 0;
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		justify-content: center;
+		gap: 12px;
+		background: var(--bg-primary);
+		color: var(--text-muted);
+		font-size: 0.929rem;
+		z-index: 50;
+	}
+	.spinner {
+		width: 28px;
+		height: 28px;
+		border: 2.5px solid var(--border);
+		border-top-color: var(--color-accent);
+		border-radius: 50%;
+		animation: spin 0.7s linear infinite;
+	}
+	@keyframes spin {
+		to { transform: rotate(360deg); }
 	}
 	.status-bar {
 		display: flex;

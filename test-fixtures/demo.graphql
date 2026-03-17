@@ -1,0 +1,21 @@
+# GraphQL demo
+type Animal {
+  id: ID!
+  name: String!
+  sound: String!
+  traits: [String!]!
+}
+
+type Query {
+  animals: [Animal!]!
+  animal(id: ID!): Animal
+}
+
+type Mutation {
+  addAnimal(name: String!, sound: String!): Animal!
+  deleteAnimal(id: ID!): Boolean!
+}
+
+type Subscription {
+  animalAdded: Animal!
+}

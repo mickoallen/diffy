@@ -1,0 +1,23 @@
+# TOML demo
+version = "1.0.0"
+debug = false
+
+[[animals]]
+id = 1
+name = "Cat"
+sound = "meow"
+traits = ["nocturnal", "carnivore"]
+
+[[animals]]
+id = 2
+name = "Dog"
+sound = "woof"
+traits = ["social", "omnivore"]
+
+[config.server]
+host = "localhost"
+port = 8080
+
+[config.database]
+host = "localhost"
+port = 5432

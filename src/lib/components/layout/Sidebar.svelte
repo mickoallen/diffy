@@ -218,7 +218,7 @@
 		{/snippet}
 		{@render renderTree(tree, 0)}
 	</div>
-	<div class="resize-handle" onmousedown={startResize} role="separator" aria-orientation="vertical"></div>
+	<div class="resize-handle" onmousedown={startResize} role="separator" aria-orientation="vertical" tabindex="0"></div>
 </aside>
 
 <style>

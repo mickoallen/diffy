@@ -1,0 +1,24 @@
+{{! Handlebars demo }}
+<!DOCTYPE html>
+<html>
+<head>
+  <title>{{title}}</title>
+</head>
+<body>
+  <h1>{{greeting}}</h1>
+
+  {{#if animals}}
+    <ul>
+      {{#each animals}}
+        <li class="{{#if this.active}}active{{/if}}">
+          <strong>{{this.name}}</strong> says {{this.sound}}
+        </li>
+      {{/each}}
+    </ul>
+  {{else}}
+    <p>No animals found.</p>
+  {{/if}}
+
+  {{> footer}}
+</body>
+</html>

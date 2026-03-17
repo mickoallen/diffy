@@ -1,0 +1,34 @@
+// SCSS demo
+$primary: #3b82f6;
+$secondary: #10b981;
+$font-stack: 'Inter', sans-serif;
+
+@mixin flex-center {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.demo {
+  font-family: $font-stack;
+  padding: 1rem;
+
+  &__title {
+    color: $primary;
+    font-size: 2rem;
+    font-weight: bold;
+  }
+
+  &__list {
+    @include flex-center;
+    flex-direction: column;
+    gap: 0.5rem;
+
+    li {
+      color: $secondary;
+      &:hover {
+        opacity: 0.8;
+      }
+    }
+  }
+}

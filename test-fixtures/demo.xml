@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- XML demo -->
+<animals>
+  <animal id="1">
+    <name>Cat</name>
+    <sound>meow</sound>
+    <traits>
+      <trait>nocturnal</trait>
+      <trait>carnivore</trait>
+    </traits>
+  </animal>
+  <animal id="2">
+    <name>Dog</name>
+    <sound>woof</sound>
+    <traits>
+      <trait>social</trait>
+      <trait>omnivore</trait>
+    </traits>
+  </animal>
+</animals>

@@ -1,3 +1,4 @@
+import { flushSync } from 'svelte';
 import {
 	getBranchToWorkdirSummary,
 	getBranchToWorkdirFileDiff,
@@ -66,7 +67,8 @@ class DiffStore {
 
 	// toRef is the base/target branch (e.g. "main"); diffs against working directory
 	async loadBranchDiff(fromRef: string, toRef: string) {
-		this.loading = true;
+		flushSync(() => { this.loading = true; });
+		await new Promise<void>(r => requestAnimationFrame(() => r()));
 		this.error = '';
 		this.fromRef = fromRef;
 		this.toRef = toRef;

@@ -1,0 +1,11 @@
+{
+  "animals": [
+    { "id": 1, "name": "Cat", "sound": "meow", "traits": ["nocturnal", "carnivore"] },
+    { "id": 2, "name": "Dog", "sound": "woof", "traits": ["social", "omnivore"] }
+  ],
+  "config": {
+    "version": "1.0.0",
+    "debug": false,
+    "maxAnimals": 100
+  }
+}

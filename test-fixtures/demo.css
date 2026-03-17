@@ -1,0 +1,25 @@
+/* CSS demo */
+:root {
+  --primary: #3b82f6;
+  --secondary: #10b981;
+}
+
+.demo {
+  font-family: 'Inter', sans-serif;
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.demo__title {
+  color: var(--primary);
+  font-size: 2rem;
+  font-weight: bold;
+}
+
+.demo__list li:hover {
+  color: var(--secondary);
+  opacity: 0.8;
+  transition: opacity 0.2s ease;
+}
