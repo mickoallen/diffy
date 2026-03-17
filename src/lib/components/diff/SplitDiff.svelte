@@ -105,13 +105,13 @@
 		padding: 4px 12px;
 		background: var(--bg-tertiary);
 		color: var(--text-muted);
-		font-family: 'SF Mono', 'Fira Code', monospace;
-		font-size: 12px;
+		font-family: var(--font-mono);
+		font-size: 0.857rem;
 		border-bottom: 1px solid var(--border);
 	}
 	.explain-btn {
 		padding: 2px 8px;
-		font-size: 11px;
+		font-size: 0.786rem;
 		border-radius: 4px;
 		border: 1px solid var(--border);
 		background: var(--bg-secondary);
@@ -122,8 +122,8 @@
 		width: 100%;
 		border-collapse: collapse;
 		table-layout: fixed;
-		font-family: 'SF Mono', 'Fira Code', monospace;
-		font-size: 13px;
+		font-family: var(--font-mono);
+		font-size: 0.929rem;
 		line-height: 1.5;
 	}
 	.line-num {

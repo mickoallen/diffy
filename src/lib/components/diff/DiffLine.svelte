@@ -36,8 +36,8 @@
 
 <style>
 	.diff-line {
-		font-family: 'SF Mono', 'Fira Code', monospace;
-		font-size: 13px;
+		font-family: var(--font-mono);
+		font-size: 0.929rem;
 		line-height: 1.5;
 	}
 	.diff-add {

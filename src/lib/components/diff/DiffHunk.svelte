@@ -1,6 +1,8 @@
 <script lang="ts">
 	import type { Hunk } from '$lib/services/git';
 	import DiffLine from './DiffLine.svelte';
+	import { highlightLine } from '$lib/utils/highlighter';
+	import { settingsStore } from '$lib/stores/settings.svelte';
 
 	interface Props {
 		hunk: Hunk;
@@ -9,6 +11,20 @@
 	}
 
 	let { hunk, filePath, onExplain }: Props = $props();
+
+	let highlighted = $state<Record<number, string>>({});
+
+	$effect(() => {
+		const currentHunk = hunk;
+		const currentPath = filePath;
+		const currentTheme = settingsStore.isDark ? 'dark' : 'light';
+		highlighted = {};
+		currentHunk.lines.forEach((line, i) => {
+			highlightLine(line.content, currentPath, currentTheme).then((html) => {
+				highlighted[i] = html;
+			});
+		});
+	});
 
 	function getHunkContent(): string {
 		return hunk.lines.map((l) => {
@@ -29,8 +45,8 @@
 	</div>
 	<table class="hunk-table">
 		<tbody>
-			{#each hunk.lines as line}
-				<DiffLine {line} />
+			{#each hunk.lines as line, i}
+				<DiffLine {line} highlighted={highlighted[i]} />
 			{/each}
 		</tbody>
 	</table>
@@ -47,13 +63,13 @@
 		padding: 4px 12px;
 		background: var(--bg-tertiary);
 		color: var(--text-muted);
-		font-family: 'SF Mono', 'Fira Code', monospace;
-		font-size: 12px;
+		font-family: var(--font-mono);
+		font-size: 0.857rem;
 		border-bottom: 1px solid var(--border);
 	}
 	.explain-btn {
 		padding: 2px 8px;
-		font-size: 11px;
+		font-size: 0.786rem;
 		border-radius: 4px;
 		border: 1px solid var(--border);
 		background: var(--bg-secondary);

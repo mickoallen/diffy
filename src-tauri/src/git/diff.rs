@@ -102,6 +102,66 @@ pub fn diff_workdir_file(repo: &Repository, file_path: &str) -> Result<FileDiff,
     extract_file_diff(&unstaged, file_path)
 }
 
+/// Diff from a base branch tree to the current working directory (staged + unstaged).
+/// Shows all changes (committed on current branch + uncommitted) relative to `base_ref`.
+pub fn diff_branch_to_workdir(repo: &Repository, base_ref: &str) -> Result<Vec<FileSummary>, String> {
+    let effective_ref = if base_ref.is_empty() { "HEAD" } else { base_ref };
+    let base_tree = resolve_tree(repo, effective_ref)?;
+
+    // Staged changes (index vs base_ref tree)
+    let staged = repo
+        .diff_tree_to_index(Some(&base_tree), None, None)
+        .map_err(|e| format!("Failed to diff staged: {}", e))?;
+
+    // Unstaged + untracked (workdir vs index)
+    let mut unstaged_opts = DiffOptions::new();
+    unstaged_opts.include_untracked(true);
+    unstaged_opts.recurse_untracked_dirs(true);
+    unstaged_opts.show_untracked_content(true);
+    let unstaged = repo
+        .diff_index_to_workdir(None, Some(&mut unstaged_opts))
+        .map_err(|e| format!("Failed to diff workdir: {}", e))?;
+
+    let mut summaries = extract_file_summaries(&staged)?;
+    let unstaged_summaries = extract_file_summaries(&unstaged)?;
+
+    for us in unstaged_summaries {
+        if !summaries.iter().any(|s| s.path == us.path) {
+            summaries.push(us);
+        }
+    }
+
+    summaries.sort_by(|a, b| a.path.cmp(&b.path));
+    Ok(summaries)
+}
+
+pub fn diff_branch_to_workdir_file(repo: &Repository, base_ref: &str, file_path: &str) -> Result<FileDiff, String> {
+    let effective_ref = if base_ref.is_empty() { "HEAD" } else { base_ref };
+    let base_tree = resolve_tree(repo, effective_ref)?;
+
+    let mut opts = DiffOptions::new();
+    opts.pathspec(file_path);
+
+    // Check staged first
+    let staged = repo
+        .diff_tree_to_index(Some(&base_tree), None, Some(&mut opts))
+        .map_err(|e| format!("Failed to diff staged: {}", e))?;
+
+    if staged.deltas().count() > 0 {
+        return extract_file_diff(&staged, file_path);
+    }
+
+    // Fall back to unstaged
+    opts.include_untracked(true);
+    opts.recurse_untracked_dirs(true);
+    opts.show_untracked_content(true);
+    let unstaged = repo
+        .diff_index_to_workdir(None, Some(&mut opts))
+        .map_err(|e| format!("Failed to diff workdir: {}", e))?;
+
+    extract_file_diff(&unstaged, file_path)
+}
+
 pub fn diff_local_vs_remote(repo: &Repository) -> Result<(Vec<FileSummary>, String, String), String> {
     let head = repo.head().map_err(|e| format!("No HEAD: {}", e))?;
     let branch_name = head.shorthand().unwrap_or("HEAD").to_string();

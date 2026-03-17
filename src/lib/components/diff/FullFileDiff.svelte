@@ -4,6 +4,8 @@
 	import { getFileContent } from '$lib/services/git';
 	import { diffStore } from '$lib/stores/diff.svelte';
 	import { repoStore } from '$lib/stores/repo.svelte';
+	import { highlightLine } from '$lib/utils/highlighter';
+	import { settingsStore } from '$lib/stores/settings.svelte';
 	import DiffHeader from './DiffHeader.svelte';
 	import DiffLineRow from './DiffLine.svelte';
 
@@ -14,12 +16,27 @@
 	let { file }: Props = $props();
 
 	let displayLines = $state<DiffLine[]>([]);
+	let highlightedLines = $state<string[]>([]);
 	let loading = $state(true);
 	let error = $state('');
 
 	$effect(() => {
 		file;
 		buildLines();
+	});
+
+	$effect(() => {
+		const lines = displayLines;
+		const path = file.path;
+		const theme = settingsStore.isDark ? 'dark' : 'light';
+		const result: string[] = new Array(lines.length).fill('');
+		highlightedLines = result;
+		lines.forEach((line, i) => {
+			highlightLine(line.content, path, theme).then((html) => {
+				result[i] = html;
+				highlightedLines = result.slice();
+			});
+		});
 	});
 
 	async function buildLines() {
@@ -95,8 +112,8 @@
 	{:else}
 		<table class="diff-table">
 			<tbody>
-				{#each displayLines as line}
-					<DiffLineRow {line} />
+				{#each displayLines as line, i}
+					<DiffLineRow {line} highlighted={highlightedLines[i]} />
 				{/each}
 			</tbody>
 		</table>
@@ -117,7 +134,7 @@
 		padding: 24px;
 		text-align: center;
 		color: var(--text-muted);
-		font-size: 14px;
+		font-size: 1rem;
 	}
 	.status.error {
 		color: var(--color-del);

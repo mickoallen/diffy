@@ -86,21 +86,21 @@
 	}
 	.panel-header h3 {
 		margin: 0;
-		font-size: 14px;
+		font-size: 1rem;
 		color: var(--text-primary);
 	}
 	.close-btn {
 		background: none;
 		border: none;
 		color: var(--text-muted);
-		font-size: 18px;
+		font-size: 1.286rem;
 		cursor: pointer;
 		padding: 0 4px;
 	}
 	.no-key {
 		padding: 16px;
 		color: var(--text-muted);
-		font-size: 13px;
+		font-size: 0.929rem;
 	}
 	.actions {
 		display: flex;
@@ -114,7 +114,7 @@
 		border: 1px solid var(--border);
 		background: var(--bg-primary);
 		color: var(--text-primary);
-		font-size: 12px;
+		font-size: 0.857rem;
 		cursor: pointer;
 	}
 	.action-btn:hover:not(:disabled) {
@@ -135,7 +135,7 @@
 		color: var(--color-del);
 		background: var(--diff-del-bg);
 		border-radius: 6px;
-		font-size: 12px;
+		font-size: 0.857rem;
 	}
 	.result {
 		padding: 12px;
@@ -143,13 +143,13 @@
 	}
 	.result h4 {
 		margin: 0 0 8px;
-		font-size: 12px;
+		font-size: 0.857rem;
 		color: var(--text-muted);
 		text-transform: uppercase;
 		letter-spacing: 0.5px;
 	}
 	.result-text {
-		font-size: 13px;
+		font-size: 0.929rem;
 		line-height: 1.5;
 		color: var(--text-primary);
 		white-space: pre-wrap;

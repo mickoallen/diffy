@@ -8,6 +8,9 @@
 	import { settingsStore } from '$lib/stores/settings.svelte';
 	import { recentsStore } from '$lib/stores/recents.svelte';
 	import { setupKeyboardShortcuts } from '$lib/utils/keyboard';
+	import type { BranchInfo } from '$lib/services/git';
+	import { getDefaultBranch, getRemoteUrl } from '$lib/services/git';
+	import { openUrl } from '@tauri-apps/plugin-opener';
 	import BranchSelector from '$lib/components/git/BranchSelector.svelte';
 	import Sidebar from '$lib/components/layout/Sidebar.svelte';
 	import MainPanel from '$lib/components/layout/MainPanel.svelte';
@@ -15,25 +18,28 @@
 	import SettingsModal from '$lib/components/layout/SettingsModal.svelte';
 
 	let repoPath = $state('');
+	let remoteUrl = $state('');
 	let repoOpened = $state(false);
 	let unlistenRefresh: UnlistenFn | undefined;
 
 	let cleanupKeyboard: (() => void) | undefined;
 
-	onMount(() => {
-		document.documentElement.setAttribute('data-theme', settingsStore.theme);
+	onMount(async () => {
+		await settingsStore.load();
 		cleanupKeyboard = setupKeyboardShortcuts();
 
 		listen<{ kind: string }>('git://refresh', async (event) => {
 			if (!repoOpened || diffStore.loading) return;
 			const { kind } = event.payload;
 			if (kind === 'git-state') {
+				const prevBranch = repoStore.currentBranch;
 				await repoStore.refreshBranches();
+				if (repoStore.currentBranch !== prevBranch) {
+					diffStore.fromRef = repoStore.currentBranch;
+				}
 				await reloadCurrentDiff();
 			} else if (kind === 'workdir') {
-				if (diffStore.compareMode === 'workdir' || diffStore.compareMode === 'local-vs-remote') {
-					await reloadCurrentDiff();
-				}
+				await reloadCurrentDiff();
 			}
 		}).then((fn) => { unlistenRefresh = fn; });
 	});
@@ -46,15 +52,16 @@
 		}
 	});
 
+	function fallbackDefaultTarget(branches: BranchInfo[], currentBranch: string): string {
+		for (const name of ['main', 'master', 'develop']) {
+			if (name !== currentBranch && branches.find(b => b.name === name)) return name;
+		}
+		return branches.find(b => !b.is_head)?.name ?? '';
+	}
+
 	async function reloadCurrentDiff() {
-		if (diffStore.compareMode === 'workdir') {
-			await diffStore.loadWorkdirDiff();
-		} else if (diffStore.compareMode === 'local-vs-remote') {
-			await diffStore.loadLocalVsRemote();
-		} else if (diffStore.compareMode === 'branch-vs-branch') {
-			if (diffStore.fromRef && diffStore.toRef) {
-				await diffStore.loadBranchDiff(diffStore.fromRef, diffStore.toRef);
-			}
+		if (diffStore.fromRef && diffStore.toRef) {
+			await diffStore.loadBranchDiff(diffStore.fromRef, diffStore.toRef);
 		}
 	}
 
@@ -65,40 +72,31 @@
 		await repoStore.open(target);
 		if (!repoStore.error) {
 			recentsStore.add(target);
+			remoteUrl = await getRemoteUrl(target).catch(() => '');
 			repoOpened = true;
 			invoke('start_watching', { path: target }).catch(() => {});
-			// Try workdir first (most useful on open), fall back to vs-remote
-			await diffStore.loadWorkdirDiff();
-			if (!diffStore.error && diffStore.summary?.files.length === 0) {
-				diffStore.error = '';
-				await diffStore.loadLocalVsRemote();
+			const fromRef = repoStore.currentBranch;
+			let toRef = await getDefaultBranch(repoPath).catch(() => '');
+			if (!toRef || toRef === fromRef) {
+				toRef = fallbackDefaultTarget(repoStore.branches, fromRef);
 			}
+			await diffStore.loadBranchDiff(fromRef, toRef);
 		}
 	}
 
-	async function handleTabChange(tab: 'workdir' | 'local-vs-remote' | 'branch-vs-branch') {
-		if (tab === 'workdir') {
-			await diffStore.loadWorkdirDiff();
-		} else if (tab === 'local-vs-remote') {
-			await diffStore.loadLocalVsRemote();
-		} else if (tab === 'branch-vs-branch') {
-			if (diffStore.fromRef && diffStore.toRef) {
-				await diffStore.loadBranchDiff(diffStore.fromRef, diffStore.toRef);
-			}
-		}
-	}
-
-	async function handleBranchCompare() {
-		if (diffStore.fromRef && diffStore.toRef) {
-			await diffStore.loadBranchDiff(diffStore.fromRef, diffStore.toRef);
-		}
+	async function handleTargetChange(v: string) {
+		diffStore.toRef = v;
+		await reloadCurrentDiff();
 	}
 </script>
 
 {#if !repoOpened}
 	<div class="welcome">
 		<div class="welcome-card">
-			<img src="/full-logo.png" alt="DiFFY" class="welcome-logo" />
+			<div class="welcome-logo-wrap">
+				<img src="/full-logo.png" alt="" class="welcome-logo-blur" aria-hidden="true" />
+				<img src="/full-logo.png" alt="DiFFY" class="welcome-logo" />
+			</div>
 			<p>Fast, beautiful local git diff viewer</p>
 			<form onsubmit={(e) => { e.preventDefault(); handleOpenRepo(); }}>
 				<!-- svelte-ignore a11y_autofocus -->
@@ -140,49 +138,51 @@
 				</div>
 			{/if}
 		</div>
+		<button class="splash-settings-btn" onclick={() => settingsStore.toggleSettings()} title="Settings">
+			<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+				<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+			</svg>
+		</button>
 	</div>
 {:else}
 	<div class="app">
 		<header class="top-bar">
 			<img src="/no-text-logo.png" alt="DiFFY" class="top-bar-logo" />
-			<nav class="tabs">
-				<button
-					class="tab"
-					class:active={diffStore.compareMode === 'workdir'}
-					onclick={() => handleTabChange('workdir')}
-				>Working Tree</button>
-				<button
-					class="tab"
-					class:active={diffStore.compareMode === 'local-vs-remote'}
-					onclick={() => handleTabChange('local-vs-remote')}
-				>vs Remote</button>
-				<button
-					class="tab"
-					class:active={diffStore.compareMode === 'branch-vs-branch'}
-					onclick={() => handleTabChange('branch-vs-branch')}
-				>Compare</button>
-			</nav>
-			{#if diffStore.compareMode === 'branch-vs-branch'}
-				<div class="branch-controls">
-					<BranchSelector
-						label="From"
-						value={diffStore.fromRef}
-						onchange={(v) => { diffStore.fromRef = v; handleBranchCompare(); }}
-					/>
-					<span class="arrow">→</span>
-					<BranchSelector
-						label="To"
-						value={diffStore.toRef}
-						onchange={(v) => { diffStore.toRef = v; handleBranchCompare(); }}
-					/>
-				</div>
+			{#if remoteUrl}
+				<button class="repo-name repo-link" onclick={() => openUrl(remoteUrl)}>{remoteUrl.replace('https://', '')}</button>
+			{:else}
+				<span class="repo-name">{repoPath.split('/').at(-1)}</span>
 			{/if}
+			<div class="branch-controls">
+				<span class="current-branch">{repoStore.currentBranch}</span>
+				<svg class="arrow-icon" width="14" height="14" viewBox="0 0 14 14" fill="none">
+					<path d="M2 7h10M8 3l4 4-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+				</svg>
+				<BranchSelector
+					label=""
+					value={diffStore.toRef}
+					onchange={handleTargetChange}
+				/>
+			</div>
 			<div class="top-actions">
-				<button class="icon-btn" onclick={() => settingsStore.toggleAiPanel()} title="AI Panel (a)">
+				<button
+					class="icon-btn"
+					class:active={settingsStore.showAiPanel}
+					onclick={() => settingsStore.toggleAiPanel()}
+					title="AI Panel (a)"
+				>
+					<svg width="15" height="15" viewBox="0 0 15 15" fill="none">
+						<path d="M7.5 1a6.5 6.5 0 1 1 0 13A6.5 6.5 0 0 1 7.5 1z" stroke="currentColor" stroke-width="1.3"/>
+						<path d="M5 6c0-1.38 1.12-2.5 2.5-2.5S10 4.62 10 6c0 1.1-.67 2.04-1.63 2.36L8 9H7l-.37-1.64C5.67 8.04 5 7.1 5 6z" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"/>
+						<rect x="7" y="10" width="1" height="1.5" rx=".5" fill="currentColor"/>
+					</svg>
 					AI
 				</button>
 				<button class="icon-btn" onclick={() => settingsStore.toggleSettings()} title="Settings">
-					⚙
+					<svg width="15" height="15" viewBox="0 0 15 15" fill="none">
+						<circle cx="7.5" cy="7.5" r="2" stroke="currentColor" stroke-width="1.3"/>
+						<path d="M7.5 1v1.5M7.5 12.5V14M14 7.5h-1.5M2.5 7.5H1M11.7 3.3l-1.06 1.06M4.36 10.64l-1.06 1.06M11.7 11.7l-1.06-1.06M4.36 4.36 3.3 3.3" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>
+					</svg>
 				</button>
 			</div>
 		</header>
@@ -196,16 +196,18 @@
 		</div>
 
 		<footer class="status-bar">
-			{#if diffStore.summary}
-				<span>
-					{diffStore.summary.files.length} file{diffStore.summary.files.length !== 1 ? 's' : ''} changed
-				</span>
-				<span class="stat-add">+{diffStore.summary.total_additions}</span>
-				<span class="stat-del">-{diffStore.summary.total_deletions}</span>
+			{#if diffStore.loading}
+				<span class="status-muted">Loading…</span>
+			{:else if diffStore.summary}
+				<span class="stat-files">{diffStore.summary.files.length} file{diffStore.summary.files.length !== 1 ? 's' : ''}</span>
+				{#if diffStore.summary.total_additions > 0}
+					<span class="stat-add">+{diffStore.summary.total_additions}</span>
+				{/if}
+				{#if diffStore.summary.total_deletions > 0}
+					<span class="stat-del">−{diffStore.summary.total_deletions}</span>
+				{/if}
 			{/if}
 			<span class="spacer"></span>
-			<span class="mode">{{workdir: 'Working Tree', 'local-vs-remote': 'vs Remote', 'branch-vs-branch': 'Compare'}[diffStore.compareMode]}</span>
-			<span class="view">{diffStore.viewMode}</span>
 		</footer>
 	</div>
 {/if}
@@ -219,16 +221,89 @@
 		align-items: center;
 		justify-content: center;
 		background: var(--bg-primary);
+		position: relative;
+		overflow: hidden;
 	}
+
+	.welcome::before {
+		content: '';
+		position: absolute;
+		inset: 0;
+		background:
+			radial-gradient(ellipse 80% 70% at 5% 95%, var(--color-add), transparent 70%),
+			radial-gradient(ellipse 70% 80% at 95% 90%, var(--color-del), transparent 70%),
+			radial-gradient(ellipse 70% 70% at 90% 5%, var(--color-rename), transparent 70%),
+			radial-gradient(ellipse 80% 60% at 5% 10%, var(--color-accent), transparent 70%),
+			radial-gradient(ellipse 60% 60% at 50% 50%, var(--color-mod), transparent 70%);
+		opacity: 0.08;
+		filter: blur(120px);
+		pointer-events: none;
+	}
+
+	.welcome::after {
+		content: '';
+		position: absolute;
+		inset: 0;
+		background: radial-gradient(ellipse 85% 75% at 50% 50%, transparent, var(--bg-primary));
+		pointer-events: none;
+	}
+	.splash-settings-btn {
+		position: absolute;
+		top: 16px;
+		right: 16px;
+		z-index: 1;
+		background: none;
+		border: 1px solid var(--border);
+		border-radius: 8px;
+		padding: 8px;
+		color: var(--text-muted);
+		cursor: pointer;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+	}
+
+	.splash-settings-btn:hover {
+		color: var(--text-primary);
+		border-color: var(--text-muted);
+	}
+
 	.welcome-card {
 		text-align: center;
 		max-width: 480px;
 		padding: 48px;
 	}
-	.welcome-logo {
+	.welcome-logo-wrap {
+		position: relative;
+		height: 224px;
+		margin-bottom: 12px;
+	}
+	.welcome-logo,
+	.welcome-logo-blur {
 		height: 224px;
 		width: auto;
-		margin-bottom: 12px;
+	}
+	.welcome-logo {
+		position: relative;
+		z-index: 1;
+	}
+	.welcome-logo-blur {
+		position: absolute;
+		top: 50%;
+		left: 50%;
+		transform: translate(-50%, -50%) scale(0.9);
+		filter: blur(24px) opacity(0.9);
+		z-index: 0;
+	}
+	:global([data-theme='chalk']),
+	:global([data-theme='nate']) {
+		.welcome-logo-blur {
+			filter: blur(40px) opacity(1) grayscale(1) brightness(0);
+			transform: translate(-50%, -50%) scale(1.1);
+		}
+		.welcome::before {
+			opacity: 0.35;
+		}
 	}
 	.welcome-card p {
 		color: var(--text-muted);
@@ -246,7 +321,7 @@
 		border: 1px solid var(--border);
 		background: var(--bg-secondary);
 		color: var(--text-primary);
-		font-size: 14px;
+		font-size: 1rem;
 		font-family: 'SF Mono', 'Fira Code', monospace;
 		box-sizing: border-box;
 	}
@@ -256,7 +331,7 @@
 		border: 1px solid var(--border);
 		background: var(--bg-secondary);
 		color: var(--text-primary);
-		font-size: 14px;
+		font-size: 1rem;
 		font-weight: 600;
 		cursor: pointer;
 		white-space: nowrap;
@@ -271,7 +346,7 @@
 		border: none;
 		background: var(--color-accent);
 		color: white;
-		font-size: 14px;
+		font-size: 1rem;
 		font-weight: 600;
 		cursor: pointer;
 	}
@@ -281,7 +356,7 @@
 	.error {
 		margin-top: 12px;
 		color: var(--color-del);
-		font-size: 13px;
+		font-size: 0.929rem;
 	}
 	.recents {
 		margin-top: 24px;
@@ -289,7 +364,7 @@
 		padding-top: 16px;
 	}
 	.recents-label {
-		font-size: 11px;
+		font-size: 0.786rem;
 		font-weight: 600;
 		text-transform: uppercase;
 		letter-spacing: 0.08em;
@@ -329,12 +404,12 @@
 		min-width: 0;
 	}
 	.recents-name {
-		font-size: 13px;
+		font-size: 0.929rem;
 		font-weight: 500;
 		color: var(--text-primary);
 	}
 	.recents-path {
-		font-size: 11px;
+		font-size: 0.786rem;
 		color: var(--text-muted);
 		white-space: nowrap;
 		overflow: hidden;
@@ -351,7 +426,7 @@
 		background: none;
 		border: none;
 		color: var(--text-muted);
-		font-size: 16px;
+		font-size: 1.143rem;
 		cursor: pointer;
 		border-radius: 4px;
 		opacity: 0;
@@ -390,53 +465,76 @@
 		width: auto;
 		flex-shrink: 0;
 	}
-	.tabs {
-		display: flex;
-		gap: 2px;
+	.repo-name {
+		font-size: 0.857rem;
+		font-weight: 600;
+		color: var(--text-secondary);
+		flex-shrink: 0;
 	}
-	.tab {
-		padding: 5px 14px;
-		border-radius: 6px;
-		border: 1px solid transparent;
+
+	.repo-link {
 		background: none;
-		color: var(--text-muted);
-		font-size: 13px;
+		border: none;
+		padding: 0;
+		font: inherit;
 		cursor: pointer;
-		transition: color 0.15s, background 0.15s;
+		text-decoration: none;
 	}
-	.tab:hover {
+
+	.repo-link:hover {
 		color: var(--text-primary);
-		background: var(--bg-primary);
-	}
-	.tab.active {
-		color: var(--text-primary);
-		background: var(--bg-primary);
-		border-color: var(--border);
+		text-decoration: underline;
 	}
 	.branch-controls {
 		display: flex;
 		align-items: center;
-		gap: 12px;
+		gap: 10px;
+		flex: 1;
+		justify-content: center;
 	}
-	.arrow {
+	.current-branch {
+		font-size: 0.929rem;
+		font-weight: 600;
+		color: var(--text-primary);
+		font-family: 'SF Mono', 'Fira Code', monospace;
+		background: var(--bg-tertiary);
+		border: 1px solid var(--border);
+		border-radius: 6px;
+		padding: 4px 10px;
+		white-space: nowrap;
+	}
+	.arrow-icon {
 		color: var(--text-muted);
-		font-size: 16px;
+		flex-shrink: 0;
 	}
 	.top-actions {
 		display: flex;
-		gap: 8px;
+		gap: 4px;
+		flex-shrink: 0;
 	}
 	.icon-btn {
-		padding: 4px 10px;
+		display: flex;
+		align-items: center;
+		gap: 5px;
+		padding: 5px 10px;
 		border-radius: 6px;
-		border: 1px solid var(--border);
-		background: var(--bg-primary);
-		color: var(--text-secondary);
-		font-size: 13px;
+		border: 1px solid transparent;
+		background: transparent;
+		color: var(--text-muted);
+		font-size: 0.857rem;
+		font-weight: 500;
 		cursor: pointer;
+		transition: color 0.15s, background 0.15s, border-color 0.15s;
 	}
 	.icon-btn:hover {
-		background: var(--bg-hover);
+		color: var(--text-primary);
+		background: var(--bg-tertiary);
+		border-color: var(--border);
+	}
+	.icon-btn.active {
+		color: var(--color-accent);
+		background: var(--bg-tertiary);
+		border-color: var(--color-accent);
 	}
 	.content {
 		flex: 1;
@@ -446,26 +544,30 @@
 	.status-bar {
 		display: flex;
 		align-items: center;
-		gap: 12px;
-		padding: 4px 16px;
+		gap: 8px;
+		padding: 3px 16px;
 		border-top: 1px solid var(--border);
 		background: var(--bg-secondary);
-		font-size: 12px;
+		font-size: 0.786rem;
 		color: var(--text-muted);
+		min-height: 24px;
+	}
+	.stat-files {
+		color: var(--text-secondary);
 	}
 	.stat-add {
 		color: var(--color-add);
+		font-weight: 600;
 	}
 	.stat-del {
 		color: var(--color-del);
+		font-weight: 600;
+	}
+	.status-muted {
+		color: var(--text-muted);
+		font-style: italic;
 	}
 	.spacer {
 		flex: 1;
-	}
-	.mode, .view {
-		padding: 1px 6px;
-		border: 1px solid var(--border);
-		border-radius: 3px;
-		font-size: 11px;
 	}
 </style>

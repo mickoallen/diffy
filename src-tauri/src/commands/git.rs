@@ -7,9 +7,21 @@ pub fn open_repo(path: String) -> Result<String, String> {
 }
 
 #[tauri::command]
+pub fn get_remote_url(path: String) -> Result<String, String> {
+    let repository = repo::open_repo(&path)?;
+    Ok(repo::get_remote_url(&repository))
+}
+
+#[tauri::command]
 pub fn list_branches(path: String) -> Result<Vec<BranchInfo>, String> {
     let repository = repo::open_repo(&path)?;
     repo::list_branches(&repository)
+}
+
+#[tauri::command]
+pub fn get_default_branch(path: String) -> Result<String, String> {
+    let repository = repo::open_repo(&path)?;
+    Ok(repo::get_default_branch(&repository))
 }
 
 #[tauri::command]

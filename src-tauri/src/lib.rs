@@ -15,7 +15,9 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             // Git commands
             git_cmds::open_repo,
+            git_cmds::get_remote_url,
             git_cmds::list_branches,
+            git_cmds::get_default_branch,
             git_cmds::get_commits_between,
             git_cmds::list_repo_files,
             git_cmds::read_repo_file,
@@ -24,6 +26,8 @@ pub fn run() {
             diff_cmds::get_file_diff,
             diff_cmds::get_workdir_summary,
             diff_cmds::get_workdir_file_diff,
+            diff_cmds::get_branch_to_workdir_summary,
+            diff_cmds::get_branch_to_workdir_file_diff,
             diff_cmds::get_local_vs_remote,
             diff_cmds::get_file_content,
             // AI commands

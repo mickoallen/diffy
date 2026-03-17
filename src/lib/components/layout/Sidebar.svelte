@@ -132,21 +132,23 @@
 	</div>
 
 	<div class="mode-row">
-		<button
-			class="mode-btn"
-			class:active={diffStore.treeMode === 'diffs'}
-			onclick={() => diffStore.setTreeMode('diffs')}
-		>
-			Diffs
-		</button>
-		<button
-			class="mode-btn"
-			class:active={diffStore.treeMode === 'all'}
-			onclick={() => diffStore.setTreeMode('all')}
-		>
-			All Files
-		</button>
-		<span class="file-count">{fileCount} file{fileCount !== 1 ? 's' : ''}</span>
+		<div class="mode-toggle">
+			<button
+				class="mode-btn"
+				class:active={diffStore.treeMode === 'diffs'}
+				onclick={() => diffStore.setTreeMode('diffs')}
+			>
+				Diffs
+			</button>
+			<button
+				class="mode-btn"
+				class:active={diffStore.treeMode === 'all'}
+				onclick={() => diffStore.setTreeMode('all')}
+			>
+				All Files
+			</button>
+		</div>
+		<span class="file-count">{fileCount}</span>
 	</div>
 
 	<div class="file-tree">
@@ -182,7 +184,9 @@
 						style="padding-left: {8 + depth * 14}px"
 						onclick={() => toggleFolder(node)}
 					>
-						<span class="chevron" class:open={expanded}>▶</span>
+						<svg class="chevron" class:open={expanded} width="10" height="10" viewBox="0 0 10 10" fill="none">
+							<path d="M3 2l4 3-4 3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+						</svg>
 						<span class="dir-name">{node.name}/</span>
 					</button>
 					{#if expanded}
@@ -197,8 +201,8 @@
 
 <style>
 	.sidebar {
-		width: 280px;
-		min-width: 200px;
+		width: 260px;
+		min-width: 180px;
 		border-right: 1px solid var(--border);
 		display: flex;
 		flex-direction: column;
@@ -211,12 +215,12 @@
 	}
 	.filter-input {
 		width: 100%;
-		padding: 6px 8px;
-		border-radius: 6px;
+		padding: 5px 8px;
+		border-radius: 5px;
 		border: 1px solid var(--border);
 		background: var(--bg-primary);
 		color: var(--text-primary);
-		font-size: 13px;
+		font-size: 0.857rem;
 		box-sizing: border-box;
 	}
 	.filter-input:focus {
@@ -226,29 +230,44 @@
 	.mode-row {
 		display: flex;
 		align-items: center;
-		gap: 2px;
-		padding: 6px 8px;
+		padding: 5px 8px;
 		border-bottom: 1px solid var(--border);
-		background: var(--bg-secondary);
+		gap: 6px;
+	}
+	.mode-toggle {
+		display: flex;
+		background: var(--bg-primary);
+		border-radius: 5px;
+		padding: 2px;
+		gap: 1px;
+		border: 1px solid var(--border);
 	}
 	.mode-btn {
-		padding: 3px 10px;
-		border: 1px solid var(--border);
-		border-radius: 4px;
+		padding: 2px 10px;
+		border: none;
+		border-radius: 3px;
 		background: transparent;
-		color: var(--text-secondary);
-		font-size: 12px;
+		color: var(--text-muted);
+		font-size: 0.786rem;
+		font-weight: 500;
 		cursor: pointer;
+		transition: color 0.12s, background 0.12s;
 	}
 	.mode-btn.active {
 		background: var(--bg-active);
 		color: var(--text-primary);
-		border-color: var(--color-accent);
 	}
 	.file-count {
 		margin-left: auto;
-		font-size: 11px;
+		font-size: 0.786rem;
 		color: var(--text-muted);
+		background: var(--bg-tertiary);
+		border: 1px solid var(--border);
+		border-radius: 10px;
+		padding: 0 6px;
+		min-width: 20px;
+		text-align: center;
+		line-height: 18px;
 	}
 	.file-tree {
 		flex: 1;
@@ -262,7 +281,7 @@
 		border: none;
 		background: var(--bg-tertiary);
 		color: var(--text-muted);
-		font-size: 12px;
+		font-size: 0.857rem;
 		font-family: 'SF Mono', 'Fira Code', monospace;
 		cursor: pointer;
 		text-align: left;
@@ -274,11 +293,10 @@
 		background: var(--bg-hover);
 	}
 	.chevron {
-		font-size: 9px;
+		flex-shrink: 0;
+		color: var(--text-muted);
 		transition: transform 0.15s;
 		transform: rotate(0deg);
-		display: inline-block;
-		width: 10px;
 	}
 	.chevron.open {
 		transform: rotate(90deg);
@@ -297,7 +315,7 @@
 		border: none;
 		background: transparent;
 		color: var(--text-primary);
-		font-size: 13px;
+		font-size: 0.929rem;
 		cursor: pointer;
 		text-align: left;
 	}
@@ -309,7 +327,7 @@
 	}
 	.status {
 		font-family: 'SF Mono', 'Fira Code', monospace;
-		font-size: 11px;
+		font-size: 0.786rem;
 		font-weight: 600;
 		width: 16px;
 		text-align: center;
@@ -338,7 +356,7 @@
 		white-space: nowrap;
 	}
 	.stats {
-		font-size: 11px;
+		font-size: 0.786rem;
 		font-family: 'SF Mono', 'Fira Code', monospace;
 		flex-shrink: 0;
 	}

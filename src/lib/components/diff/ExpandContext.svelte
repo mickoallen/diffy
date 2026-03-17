@@ -9,17 +9,21 @@
 	 *   loading   — true while fetching file content
 	 *   onExpand  — called when user first clicks expand (triggers lazy load)
 	 */
+	import { highlightLine } from '$lib/utils/highlighter';
+	import { settingsStore } from '$lib/stores/settings.svelte';
+
 	const EXPAND_AMOUNT = 10;
 
 	interface Props {
 		gapStart: number;
 		gapEnd: number;
 		fileLines: string[] | null;
+		filePath?: string;
 		loading?: boolean;
 		onExpand: () => void;
 	}
 
-	let { gapStart, gapEnd, fileLines, loading = false, onExpand }: Props = $props();
+	let { gapStart, gapEnd, fileLines, filePath = '', loading = false, onExpand }: Props = $props();
 
 	let expandedTop = $state(0);
 	let expandedBottom = $state(0);
@@ -45,6 +49,31 @@
 		fileLines ? fileLines.slice(bottomOffset - 1, bottomOffset - 1 + expandedBottom) : []
 	);
 
+	let highlightedTop = $state<Record<number, string>>({});
+	let highlightedBottom = $state<Record<number, string>>({});
+
+	$effect(() => {
+		const lines = topLines;
+		const path = filePath;
+		const theme = settingsStore.isDark ? 'dark' : 'light';
+		lines.forEach((content, i) => {
+			highlightLine(content, path, theme).then((html) => {
+				highlightedTop[i] = html;
+			});
+		});
+	});
+
+	$effect(() => {
+		const lines = bottomLines;
+		const path = filePath;
+		const theme = settingsStore.isDark ? 'dark' : 'light';
+		lines.forEach((content, i) => {
+			highlightLine(content, path, theme).then((html) => {
+				highlightedBottom[i] = html;
+			});
+		});
+	});
+
 	function handleExpandTop() {
 		if (fileLines === null) { onExpand(); return; }
 		expandedTop += Math.min(EXPAND_AMOUNT, remaining);
@@ -67,7 +96,7 @@
 		<div class="ctx-line">
 			<span class="lineno">{gapStart + i}</span>
 			<span class="origin"> </span>
-			<span class="content">{lineContent}</span>
+			<span class="content">{#if highlightedTop[i]}{@html highlightedTop[i]}{:else}{lineContent}{/if}</span>
 		</div>
 	{/each}
 
@@ -91,15 +120,15 @@
 		<div class="ctx-line">
 			<span class="lineno">{bottomOffset + i}</span>
 			<span class="origin"> </span>
-			<span class="content">{lineContent}</span>
+			<span class="content">{#if highlightedBottom[i]}{@html highlightedBottom[i]}{:else}{lineContent}{/if}</span>
 		</div>
 	{/each}
 </div>
 
 <style>
 	.expand-context {
-		font-family: 'SF Mono', 'Fira Code', monospace;
-		font-size: 13px;
+		font-family: var(--font-mono);
+		font-size: 0.929rem;
 	}
 	.ctx-line {
 		display: flex;
@@ -138,7 +167,7 @@
 	}
 	.expand-btn {
 		padding: 2px 10px;
-		font-size: 11px;
+		font-size: 0.786rem;
 		border: 1px solid var(--border);
 		border-radius: 4px;
 		background: var(--bg-secondary);
@@ -149,7 +178,7 @@
 		background: var(--bg-hover);
 	}
 	.gap-info {
-		font-size: 11px;
+		font-size: 0.786rem;
 		color: var(--text-muted);
 	}
 </style>

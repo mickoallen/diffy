@@ -47,8 +47,8 @@
 		padding: 8px 12px;
 		background: var(--bg-secondary);
 		border-bottom: 1px solid var(--border);
-		font-family: 'SF Mono', 'Fira Code', monospace;
-		font-size: 13px;
+		font-family: var(--font-mono);
+		font-size: 0.929rem;
 	}
 	.status-badge {
 		display: inline-flex;
@@ -57,7 +57,7 @@
 		width: 20px;
 		height: 20px;
 		border-radius: 4px;
-		font-size: 11px;
+		font-size: 0.786rem;
 		font-weight: 600;
 	}
 	.added {

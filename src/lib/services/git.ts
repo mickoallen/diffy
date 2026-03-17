@@ -3,6 +3,7 @@ import { invoke } from '@tauri-apps/api/core';
 export interface BranchInfo {
 	name: string;
 	is_head: boolean;
+	is_remote: boolean;
 	upstream: string | null;
 }
 
@@ -97,6 +98,26 @@ export async function getLocalVsRemote(
 	path: string
 ): Promise<[DiffSummary, string, string]> {
 	return invoke('get_local_vs_remote', { path });
+}
+
+export async function getRemoteUrl(path: string): Promise<string> {
+	return invoke('get_remote_url', { path });
+}
+
+export async function getDefaultBranch(path: string): Promise<string> {
+	return invoke('get_default_branch', { path });
+}
+
+export async function getBranchToWorkdirSummary(path: string, baseRef: string): Promise<DiffSummary> {
+	return invoke('get_branch_to_workdir_summary', { path, baseRef });
+}
+
+export async function getBranchToWorkdirFileDiff(
+	path: string,
+	baseRef: string,
+	filePath: string
+): Promise<FileDiff> {
+	return invoke('get_branch_to_workdir_file_diff', { path, baseRef, filePath });
 }
 
 export async function listRepoFiles(path: string): Promise<string[]> {

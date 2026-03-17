@@ -4,6 +4,10 @@
   <img src="images/logowithback.png" alt="DiFFY" width="400" />
 </p>
 
+<p align="center">
+  <img src="images/screenshot1.png" alt="DiFFY screenshot" width="900" />
+</p>
+
 A desktop app for reviewing git diffs with AI-powered explanations. Compare branches, inspect commits, and get plain-language summaries of code changes — all without leaving your desktop.
 
 ## Features
@@ -15,9 +19,35 @@ A desktop app for reviewing git diffs with AI-powered explanations. Compare bran
 
 ## Prerequisites
 
-- [Rust toolchain](https://rustup.rs/) (stable)
-- [Node.js](https://nodejs.org/) 18+
-- A [Claude API key](https://console.anthropic.com/) (set via Settings in the app)
+### Node.js 18+
+
+**macOS/Linux** — via [nvm](https://github.com/nvm-sh/nvm):
+```bash
+curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.7/install.sh | bash
+nvm install 18
+```
+
+**Windows** — download the installer from [nodejs.org](https://nodejs.org/).
+
+Verify: `node --version`
+
+### Rust (stable)
+
+**macOS/Linux:**
+```bash
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+```
+
+**Windows** — download and run [rustup-init.exe](https://rustup.rs/).
+
+Restart your shell, then verify: `rustc --version`
+
+Tauri also requires a C compiler and platform libraries. See the [Tauri prerequisites guide](https://tauri.app/start/prerequisites/) for OS-specific steps (e.g. `xcode-select --install` on macOS, `build-essential` on Ubuntu).
+
+### Claude API key
+
+1. Sign in at [console.anthropic.com](https://console.anthropic.com/) and create an API key.
+2. Open DiFFY, click the **Settings** icon, and paste the key. It is stored locally and never transmitted anywhere except Anthropic's API.
 
 ## Development
 

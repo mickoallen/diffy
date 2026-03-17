@@ -68,6 +68,7 @@
 					gapStart={gaps[i].gapStart}
 					gapEnd={gaps[i].gapEnd}
 					{fileLines}
+					filePath={file.path}
 					loading={fileLoading}
 					onExpand={ensureFileLoaded}
 				/>

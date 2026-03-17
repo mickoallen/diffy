@@ -62,7 +62,7 @@
 		border-radius: 4px;
 		background: transparent;
 		color: var(--text-secondary);
-		font-size: 12px;
+		font-size: 0.857rem;
 		cursor: pointer;
 	}
 	.toggle-btn.active {
@@ -72,7 +72,7 @@
 	}
 	.shortcut-hint {
 		margin-left: 8px;
-		font-size: 11px;
+		font-size: 0.786rem;
 		color: var(--text-muted);
 		padding: 1px 4px;
 		border: 1px solid var(--border);

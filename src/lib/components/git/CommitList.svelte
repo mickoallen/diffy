@@ -40,7 +40,7 @@
 		gap: 8px;
 		padding: 6px 12px;
 		border-bottom: 1px solid var(--border);
-		font-size: 12px;
+		font-size: 0.857rem;
 	}
 	.commit:last-child {
 		border-bottom: none;

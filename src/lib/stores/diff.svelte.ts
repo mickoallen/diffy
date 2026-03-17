@@ -1,9 +1,7 @@
 import {
-	getDiffSummary,
-	getFileDiff,
-	getLocalVsRemote,
+	getBranchToWorkdirSummary,
+	getBranchToWorkdirFileDiff,
 	getWorkdirSummary,
-	getWorkdirFileDiff,
 	listRepoFiles,
 	readRepoFile,
 	type DiffSummary,
@@ -12,12 +10,10 @@ import {
 } from '$lib/services/git';
 import { repoStore } from './repo.svelte';
 
-export type CompareMode = 'local-vs-remote' | 'branch-vs-branch' | 'workdir';
 export type ViewMode = 'unified' | 'split' | 'full';
 export type TreeMode = 'diffs' | 'all';
 
 class DiffStore {
-	compareMode = $state<CompareMode>('local-vs-remote');
 	viewMode = $state<ViewMode>('unified');
 	treeMode = $state<TreeMode>('diffs');
 
@@ -32,6 +28,9 @@ class DiffStore {
 	selectedRepoFile = $state<string | null>(null);
 	fullFileContent = $state<string | null>(null);
 
+	localChangesCount = $state(0);
+	// updated separately to reflect uncommitted-only count (for badge display)
+
 	loading = $state(false);
 	fileLoading = $state(false);
 	error = $state('');
@@ -40,51 +39,25 @@ class DiffStore {
 		this.summary?.files.findIndex((f) => f.path === this.selectedFile?.path) ?? -1
 	);
 
-	async loadWorkdirDiff() {
-		this.loading = true;
-		this.error = '';
+	async refreshLocalChanges() {
 		try {
-			this.summary = await getWorkdirSummary(repoStore.path);
-			this.fromRef = '';
-			this.toRef = '';
-			this.compareMode = 'workdir';
-			if (this.summary.files.length > 0) {
-				await this.selectFile(this.summary.files[0]);
-			}
-		} catch (e) {
-			this.error = String(e);
-		} finally {
-			this.loading = false;
+			const workdir = await getWorkdirSummary(repoStore.path);
+			this.localChangesCount = workdir.files.length;
+		} catch {
+			this.localChangesCount = 0;
 		}
 	}
 
-	async loadLocalVsRemote() {
-		this.loading = true;
-		this.error = '';
-		try {
-			const [summary, upstream, branch] = await getLocalVsRemote(repoStore.path);
-			this.summary = summary;
-			this.fromRef = upstream;
-			this.toRef = branch;
-			this.compareMode = 'local-vs-remote';
-			if (summary.files.length > 0) {
-				await this.selectFile(summary.files[0]);
-			}
-		} catch (e) {
-			this.error = String(e);
-		} finally {
-			this.loading = false;
-		}
-	}
-
+	// toRef is the base/target branch (e.g. "main"); diffs against working directory
 	async loadBranchDiff(fromRef: string, toRef: string) {
 		this.loading = true;
 		this.error = '';
 		this.fromRef = fromRef;
 		this.toRef = toRef;
 		try {
-			this.summary = await getDiffSummary(repoStore.path, fromRef, toRef);
-			this.compareMode = 'branch-vs-branch';
+			this.summary = await getBranchToWorkdirSummary(repoStore.path, toRef);
+			this.selectedFile = null;
+			this.fileDiff = null;
 			if (this.summary.files.length > 0) {
 				await this.selectFile(this.summary.files[0]);
 			}
@@ -99,11 +72,7 @@ class DiffStore {
 		this.selectedFile = file;
 		this.fileLoading = true;
 		try {
-			if (this.compareMode === 'workdir') {
-				this.fileDiff = await getWorkdirFileDiff(repoStore.path, file.path);
-			} else {
-				this.fileDiff = await getFileDiff(repoStore.path, this.fromRef, this.toRef, file.path);
-			}
+			this.fileDiff = await getBranchToWorkdirFileDiff(repoStore.path, this.toRef, file.path);
 		} catch (e) {
 			this.error = String(e);
 		} finally {
