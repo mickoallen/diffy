@@ -27,6 +27,27 @@
 	// Collapsed folder paths — persists across tree rebuilds
 	let collapsedPaths = $state(new Set<string>());
 
+	// Resizable sidebar width
+	let sidebarWidth = $state(260);
+	const MIN_WIDTH = 160;
+	const MAX_WIDTH = 600;
+
+	function startResize(e: MouseEvent) {
+		e.preventDefault();
+		const startX = e.clientX;
+		const startWidth = sidebarWidth;
+
+		function onMove(e: MouseEvent) {
+			sidebarWidth = Math.min(MAX_WIDTH, Math.max(MIN_WIDTH, startWidth + e.clientX - startX));
+		}
+		function onUp() {
+			window.removeEventListener('mousemove', onMove);
+			window.removeEventListener('mouseup', onUp);
+		}
+		window.addEventListener('mousemove', onMove);
+		window.addEventListener('mouseup', onUp);
+	}
+
 	function buildTree(paths: string[], diffFiles: Map<string, FileSummary>): TreeNode[] {
 		const root: TreeNode[] = [];
 
@@ -120,7 +141,7 @@
 	}
 </script>
 
-<aside class="sidebar">
+<aside class="sidebar" style="width: {sidebarWidth}px; min-width: {sidebarWidth}px;">
 	<div class="filter-row">
 		<input
 			id="file-filter"
@@ -197,17 +218,32 @@
 		{/snippet}
 		{@render renderTree(tree, 0)}
 	</div>
+	<div class="resize-handle" onmousedown={startResize} role="separator" aria-orientation="vertical"></div>
 </aside>
 
 <style>
 	.sidebar {
-		width: 260px;
-		min-width: 180px;
 		border-right: 1px solid var(--border);
 		display: flex;
 		flex-direction: column;
 		background: var(--bg-secondary);
 		overflow-y: auto;
+		position: relative;
+		flex-shrink: 0;
+	}
+	.resize-handle {
+		position: absolute;
+		top: 0;
+		right: -3px;
+		width: 6px;
+		height: 100%;
+		cursor: col-resize;
+		z-index: 10;
+	}
+	.resize-handle:hover,
+	.resize-handle:active {
+		background: var(--color-accent);
+		opacity: 0.4;
 	}
 	.filter-row {
 		padding: 8px;
@@ -272,12 +308,14 @@
 	.file-tree {
 		flex: 1;
 		overflow-y: auto;
+		overflow-x: auto;
 	}
 	.dir-item {
 		display: flex;
 		align-items: center;
 		gap: 5px;
-		width: 100%;
+		width: max-content;
+		min-width: 100%;
 		border: none;
 		background: var(--bg-tertiary);
 		color: var(--text-muted);
@@ -308,7 +346,8 @@
 		display: flex;
 		align-items: center;
 		gap: 6px;
-		width: 100%;
+		width: max-content;
+		min-width: 100%;
 		padding-top: 4px;
 		padding-bottom: 4px;
 		padding-right: 12px;

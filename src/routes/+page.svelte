@@ -84,6 +84,15 @@
 		}
 	}
 
+	function handleCloseRepo() {
+		invoke('stop_watching').catch(() => {});
+		repoStore.reset();
+		diffStore.reset();
+		repoOpened = false;
+		repoPath = '';
+		remoteUrl = '';
+	}
+
 	async function handleTargetChange(v: string) {
 		diffStore.toRef = v;
 		await reloadCurrentDiff();
@@ -148,6 +157,11 @@
 	<div class="app">
 		<header class="top-bar">
 			<img src="/no-text-logo.png" alt="DiFFY" class="top-bar-logo" />
+			<button class="back-btn" onclick={handleCloseRepo} title="Change project">
+				<svg width="15" height="15" viewBox="0 0 15 15" fill="none">
+					<path d="M9 3L4 7.5 9 12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+				</svg>
+			</button>
 			{#if remoteUrl}
 				<button class="repo-name repo-link" onclick={() => openUrl(remoteUrl)}>{remoteUrl.replace('https://', '')}</button>
 			{:else}
@@ -464,6 +478,22 @@
 		height: 24px;
 		width: auto;
 		flex-shrink: 0;
+	}
+	.back-btn {
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		padding: 4px;
+		border-radius: 5px;
+		border: none;
+		background: transparent;
+		color: var(--text-muted);
+		cursor: pointer;
+		flex-shrink: 0;
+	}
+	.back-btn:hover {
+		color: var(--text-primary);
+		background: var(--bg-tertiary);
 	}
 	.repo-name {
 		font-size: 0.857rem;

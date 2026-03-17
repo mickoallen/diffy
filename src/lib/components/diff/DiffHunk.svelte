@@ -80,7 +80,8 @@
 		background: var(--bg-hover);
 	}
 	.hunk-table {
-		width: 100%;
+		width: max-content;
+		min-width: 100%;
 		border-collapse: collapse;
 	}
 </style>

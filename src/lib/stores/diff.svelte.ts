@@ -39,6 +39,22 @@ class DiffStore {
 		this.summary?.files.findIndex((f) => f.path === this.selectedFile?.path) ?? -1
 	);
 
+	reset() {
+		this.fromRef = '';
+		this.toRef = '';
+		this.summary = null;
+		this.selectedFile = null;
+		this.fileDiff = null;
+		this.allFiles = [];
+		this.selectedRepoFile = null;
+		this.fullFileContent = null;
+		this.localChangesCount = 0;
+		this.loading = false;
+		this.fileLoading = false;
+		this.error = '';
+		this.treeMode = 'diffs';
+	}
+
 	async refreshLocalChanges() {
 		try {
 			const workdir = await getWorkdirSummary(repoStore.path);

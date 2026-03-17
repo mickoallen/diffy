@@ -65,6 +65,5 @@
 	.content {
 		padding: 0 8px;
 		white-space: pre;
-		overflow-x: auto;
 	}
 </style>

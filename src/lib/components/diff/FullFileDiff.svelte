@@ -8,6 +8,7 @@
 	import { settingsStore } from '$lib/stores/settings.svelte';
 	import DiffHeader from './DiffHeader.svelte';
 	import DiffLineRow from './DiffLine.svelte';
+	import ScrollMap from './ScrollMap.svelte';
 
 	interface Props {
 		file: FileDiff;
@@ -19,6 +20,12 @@
 	let highlightedLines = $state<string[]>([]);
 	let loading = $state(true);
 	let error = $state('');
+	let containerEl = $state<HTMLElement | null>(null);
+	let scrollEl = $state<HTMLElement | null>(null);
+
+	$effect(() => {
+		scrollEl = containerEl?.closest('.diff-view') as HTMLElement ?? null;
+	});
 
 	$effect(() => {
 		file;
@@ -103,7 +110,7 @@
 	}
 </script>
 
-<div class="full-file-diff">
+<div class="full-file-diff" bind:this={containerEl}>
 	<DiffHeader {file} />
 	{#if loading}
 		<div class="status">Loading…</div>
@@ -119,15 +126,19 @@
 		</table>
 	{/if}
 </div>
+<ScrollMap lines={displayLines} {scrollEl} />
 
 <style>
 	.full-file-diff {
 		border: 1px solid var(--border);
 		border-radius: 6px;
 		overflow: hidden;
+		width: max-content;
+		min-width: 100%;
 	}
 	.diff-table {
-		width: 100%;
+		width: max-content;
+		min-width: 100%;
 		border-collapse: collapse;
 	}
 	.status {

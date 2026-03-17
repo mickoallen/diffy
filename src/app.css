@@ -134,6 +134,26 @@ body {
 	height: 8px;
 }
 
+/* Always show horizontal scrollbar on diff view and file tree */
+.diff-view::-webkit-scrollbar,
+.file-tree::-webkit-scrollbar {
+	width: 6px;
+	height: 6px;
+}
+.diff-view::-webkit-scrollbar-track,
+.file-tree::-webkit-scrollbar-track {
+	background: var(--bg-tertiary);
+}
+.diff-view::-webkit-scrollbar-thumb,
+.file-tree::-webkit-scrollbar-thumb {
+	background: var(--border);
+	border-radius: 3px;
+}
+.diff-view::-webkit-scrollbar-thumb:hover,
+.file-tree::-webkit-scrollbar-thumb:hover {
+	background: var(--text-muted);
+}
+
 ::-webkit-scrollbar-track {
 	background: transparent;
 }

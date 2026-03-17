@@ -21,6 +21,13 @@ class RepoStore {
 		}
 	}
 
+	reset() {
+		this.path = '';
+		this.branches = [];
+		this.error = '';
+		this.loading = false;
+	}
+
 	async refreshBranches() {
 		if (!this.path) return;
 		try {
