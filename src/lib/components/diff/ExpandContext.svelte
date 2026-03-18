@@ -90,14 +90,6 @@
 </script>
 
 <div class="expand-context">
-	{#each topLines as lineContent, i}
-		<div class="ctx-line">
-			<span class="lineno">{gapStart + i}</span>
-			<span class="origin"> </span>
-			<span class="content">{#if highlightedTop[i]}{@html highlightedTop[i]}{:else}{lineContent}{/if}</span>
-		</div>
-	{/each}
-
 	{#if remaining > 0}
 		<div class="expand-bar">
 			{#if loading}
@@ -107,12 +99,19 @@
 					↕ Expand all {remaining} line{remaining === 1 ? '' : 's'}
 				</button>
 			{:else}
-				<button class="expand-btn" onclick={handleExpandTop}>↑ Expand {EXPAND_AMOUNT}</button>
+				<button class="expand-btn" onclick={handleExpandTop}>↓ Expand {EXPAND_AMOUNT} ↓</button>
 				<span class="gap-info">··· {remaining} hidden line{remaining === 1 ? '' : 's'} ···</span>
-				<button class="expand-btn" onclick={handleExpandBottom}>↓ Expand {EXPAND_AMOUNT}</button>
 			{/if}
 		</div>
 	{/if}
+
+	{#each topLines as lineContent, i}
+		<div class="ctx-line">
+			<span class="lineno">{gapStart + i}</span>
+			<span class="origin"> </span>
+			<span class="content">{#if highlightedTop[i]}{@html highlightedTop[i]}{:else}{lineContent}{/if}</span>
+		</div>
+	{/each}
 
 	{#each bottomLines as lineContent, i}
 		<div class="ctx-line">
@@ -121,6 +120,13 @@
 			<span class="content">{#if highlightedBottom[i]}{@html highlightedBottom[i]}{:else}{lineContent}{/if}</span>
 		</div>
 	{/each}
+
+	{#if remaining > 0 && !(remaining <= EXPAND_AMOUNT || gapSize <= EXPAND_AMOUNT) && !loading}
+		<div class="expand-bar">
+			<button class="expand-btn" onclick={handleExpandBottom}>↑ Expand {EXPAND_AMOUNT} ↑</button>
+			<span class="gap-info">··· {remaining} hidden line{remaining === 1 ? '' : 's'} ···</span>
+		</div>
+	{/if}
 </div>
 
 <style>
@@ -160,8 +166,6 @@
 		gap: 12px;
 		padding: 3px 0;
 		background: var(--bg-tertiary);
-		border-top: 1px dashed var(--border);
-		border-bottom: 1px dashed var(--border);
 	}
 	.expand-btn {
 		padding: 2px 10px;

@@ -54,7 +54,6 @@
 
 <style>
 	.hunk {
-		border-bottom: 1px solid var(--border);
 	}
 	.hunk-header {
 		display: flex;

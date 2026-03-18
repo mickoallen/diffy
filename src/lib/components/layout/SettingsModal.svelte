@@ -46,7 +46,7 @@
 		modelsError = '';
 		try {
 			models = await listAiModels(settingsStore.aiProvider, settingsStore.aiApiKey, settingsStore.aiBaseUrl);
-			if (models.length > 0 && !models.includes(settingsStore.aiModel)) {
+			if (models.length > 0 && !settingsStore.aiModel) {
 				settingsStore.aiModel = models[0];
 				settingsStore.save();
 			}
@@ -60,6 +60,7 @@
 
 	function onProviderChange(p: AiProvider) {
 		settingsStore.aiProvider = p;
+		settingsStore.aiModel = '';
 		if (p === 'ollama') settingsStore.aiBaseUrl = 'http://localhost:11434';
 		else if (p === 'lmstudio') settingsStore.aiBaseUrl = 'http://localhost:1234';
 		settingsStore.save();
@@ -164,6 +165,7 @@
 							type="text"
 							class="input"
 							bind:value={settingsStore.aiBaseUrl}
+							onchange={saveAiSettings}
 								/>
 					</div>
 				{/if}
@@ -177,6 +179,7 @@
 							class="input"
 							placeholder={settingsStore.aiProvider === 'claude' ? 'sk-ant-...' : settingsStore.aiProvider === 'openai' ? 'sk-...' : 'API key'}
 							bind:value={settingsStore.aiApiKey}
+							onchange={saveAiSettings}
 								/>
 					</div>
 				{/if}
@@ -194,6 +197,7 @@
 							class="input"
 							list="ai-model-list"
 							bind:value={settingsStore.aiModel}
+							onchange={saveAiSettings}
 								placeholder="e.g. claude-sonnet-4-6"
 						/>
 						<datalist id="ai-model-list">
