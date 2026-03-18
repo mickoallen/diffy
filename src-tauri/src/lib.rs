@@ -4,6 +4,7 @@ mod git;
 mod watcher;
 
 use commands::{ai as ai_cmds, diff as diff_cmds, git as git_cmds, watcher as watcher_cmds};
+use tauri::Manager;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -12,6 +13,13 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_store::Builder::default().build())
         .manage(watcher::WatcherState::new())
+        .setup(|app| {
+            // Force the main window to grab focus on launch (macOS workaround).
+            if let Some(w) = app.get_webview_window("main") {
+                let _ = w.set_focus();
+            }
+            Ok(())
+        })
         .invoke_handler(tauri::generate_handler![
             // Git commands
             git_cmds::open_repo,
@@ -34,6 +42,8 @@ pub fn run() {
             ai_cmds::ai_summarize,
             ai_cmds::ai_flag_issues,
             ai_cmds::ai_explain_hunk,
+            ai_cmds::list_ai_models,
+            ai_cmds::test_ai_connection,
             // Watcher commands
             watcher_cmds::start_watching,
             watcher_cmds::stop_watching,

@@ -1,5 +1,7 @@
 <script lang="ts">
-	import { settingsStore, type Theme, type Font, type Scale } from '$lib/stores/settings.svelte';
+	import { onMount } from 'svelte';
+	import { settingsStore, type Theme, type Font, type Scale, type AiProvider } from '$lib/stores/settings.svelte';
+	import { listAiModels, testAiConnection } from '$lib/services/ai';
 
 	const themes: { value: Theme; label: string; dark: boolean }[] = [
 		{ value: 'void', label: 'Void', dark: true },
@@ -21,11 +23,79 @@
 		{ value: 'relaxed', label: 'Relaxed' },
 		{ value: 'large', label: 'Large' }
 	];
+
+	const providers: { value: AiProvider; label: string }[] = [
+		{ value: 'claude', label: 'Claude' },
+		{ value: 'openai', label: 'OpenAI' },
+		{ value: 'gemini', label: 'Gemini' },
+		{ value: 'ollama', label: 'Ollama' },
+		{ value: 'lmstudio', label: 'LM Studio' }
+	];
+
+	let models = $state<string[]>([]);
+	let modelsLoading = $state(false);
+	let modelsError = $state('');
+	let testStatus = $state<'idle' | 'testing' | 'ok' | 'error'>('idle');
+	let testError = $state('');
+
+	const LOCAL_PROVIDERS = new Set(['ollama', 'lmstudio']);
+	const NO_KEY_PROVIDERS = new Set(['ollama']);
+
+	async function loadModels() {
+		modelsLoading = true;
+		modelsError = '';
+		try {
+			models = await listAiModels(settingsStore.aiProvider, settingsStore.aiApiKey, settingsStore.aiBaseUrl);
+			if (models.length > 0 && !models.includes(settingsStore.aiModel)) {
+				settingsStore.aiModel = models[0];
+				settingsStore.save();
+			}
+		} catch (e) {
+			modelsError = String(e);
+			models = [];
+		} finally {
+			modelsLoading = false;
+		}
+	}
+
+	function onProviderChange(p: AiProvider) {
+		settingsStore.aiProvider = p;
+		if (p === 'ollama') settingsStore.aiBaseUrl = 'http://localhost:11434';
+		else if (p === 'lmstudio') settingsStore.aiBaseUrl = 'http://localhost:1234';
+		settingsStore.save();
+		testStatus = 'idle';
+		loadModels();
+	}
+
+	function saveAiSettings() {
+		settingsStore.save();
+		testStatus = 'idle';
+	}
+
+	async function testConnection() {
+		testStatus = 'testing';
+		testError = '';
+		try {
+			await testAiConnection({
+				provider: settingsStore.aiProvider,
+				apiKey: settingsStore.aiApiKey,
+				model: settingsStore.aiModel,
+				baseUrl: settingsStore.aiBaseUrl
+			});
+			testStatus = 'ok';
+		} catch (e) {
+			testStatus = 'error';
+			testError = String(e);
+		}
+	}
+
+	onMount(() => {
+		loadModels();
+	});
 </script>
 
-{#if settingsStore.showSettings}
-	<!-- svelte-ignore a11y_click_events_have_key_events -->
-	<div class="overlay" onclick={() => (settingsStore.showSettings = false)} role="presentation">
+<!-- svelte-ignore a11y_click_events_have_key_events -->
+<div class="overlay" onclick={() => (settingsStore.showSettings = false)} role="presentation">
 		<!-- svelte-ignore a11y_interactive_supports_focus -->
 		<div class="modal" onclick={(e) => e.stopPropagation()} role="dialog" aria-label="Settings">
 			<div class="modal-header">
@@ -75,17 +145,80 @@
 			</div>
 
 			<div class="setting-group">
-				<div class="setting-label-row">
-					<label class="setting-label" for="api-key">Claude API Key</label>
-					<span class="coming-soon">Coming soon</span>
+				<span class="setting-label">AI Provider</span>
+				<div class="toggle-row">
+					{#each providers as p}
+						<button
+							class="scale-btn"
+							class:active={settingsStore.aiProvider === p.value}
+							onclick={() => onProviderChange(p.value)}
+						>{p.label}</button>
+					{/each}
 				</div>
-				<input
-					id="api-key"
-					type="password"
-					placeholder="sk-ant-..."
-					disabled
-					class="input"
-				/>
+
+				{#if LOCAL_PROVIDERS.has(settingsStore.aiProvider)}
+					<div class="field-row">
+						<label class="field-label" for="base-url">Base URL</label>
+						<input
+							id="base-url"
+							type="text"
+							class="input"
+							bind:value={settingsStore.aiBaseUrl}
+								/>
+					</div>
+				{/if}
+
+				{#if !NO_KEY_PROVIDERS.has(settingsStore.aiProvider)}
+					<div class="field-row">
+						<label class="field-label" for="api-key">API Key</label>
+						<input
+							id="api-key"
+							type="password"
+							class="input"
+							placeholder={settingsStore.aiProvider === 'claude' ? 'sk-ant-...' : settingsStore.aiProvider === 'openai' ? 'sk-...' : 'API key'}
+							bind:value={settingsStore.aiApiKey}
+								/>
+					</div>
+				{/if}
+
+				<div class="field-row">
+					<label class="field-label" for="ai-model">Model</label>
+					{#if modelsLoading}
+						<div class="input input-placeholder">Loading models…</div>
+					{:else if modelsError}
+						<div class="input input-error" title={modelsError}>Could not load models</div>
+					{:else}
+						<input
+							id="ai-model"
+							type="text"
+							class="input"
+							list="ai-model-list"
+							bind:value={settingsStore.aiModel}
+								placeholder="e.g. claude-sonnet-4-6"
+						/>
+						<datalist id="ai-model-list">
+							{#each models as m}
+								<option value={m} />
+							{/each}
+						</datalist>
+					{/if}
+				</div>
+
+				<div class="ai-actions">
+					<button class="action-btn save-btn" onclick={saveAiSettings}>Save</button>
+					<button
+						class="action-btn test-btn"
+						onclick={testConnection}
+						disabled={testStatus === 'testing'}
+					>
+						{testStatus === 'testing' ? 'Testing…' : 'Test Connection'}
+					</button>
+					{#if testStatus === 'ok'}
+						<span class="test-ok">✓ Connected</span>
+					{:else if testStatus === 'error'}
+						<span class="test-err" title={testError}>Failed</span>
+					{/if}
+				</div>
 			</div>
 
 			<div class="setting-group">
@@ -100,7 +233,6 @@
 			</div>
 		</div>
 	</div>
-{/if}
 
 <style>
 	.overlay {
@@ -234,24 +366,14 @@
 		background: var(--bg-primary);
 		color: var(--text-primary);
 	}
-	.setting-label-row {
-		display: flex;
-		align-items: center;
-		gap: 8px;
-		margin-bottom: 8px;
+	.field-row {
+		margin-top: 10px;
 	}
-	.setting-label-row .setting-label {
-		margin-bottom: 0;
-	}
-	.coming-soon {
-		font-size: 0.714rem;
-		font-weight: 500;
+	.field-label {
+		display: block;
+		font-size: 0.786rem;
 		color: var(--text-muted);
-		background: var(--bg-tertiary);
-		border: 1px solid var(--border);
-		border-radius: 10px;
-		padding: 1px 7px;
-		letter-spacing: 0.3px;
+		margin-bottom: 4px;
 	}
 	.input {
 		width: 100%;
@@ -264,9 +386,55 @@
 		font-family: var(--font-mono);
 		box-sizing: border-box;
 	}
-	.input:disabled {
-		opacity: 0.4;
-		cursor: not-allowed;
+	.input-placeholder {
+		color: var(--text-muted);
+		font-style: italic;
+	}
+	.input-error {
+		color: var(--color-deleted, #f85149);
+		cursor: help;
+	}
+	.ai-actions {
+		display: flex;
+		align-items: center;
+		gap: 8px;
+		margin-top: 12px;
+	}
+	.action-btn {
+		padding: 6px 14px;
+		border-radius: 6px;
+		border: 1px solid var(--border);
+		cursor: pointer;
+		font-size: 0.857rem;
+		font-family: var(--font-mono);
+	}
+	.save-btn {
+		background: var(--bg-secondary);
+		color: var(--text-primary);
+	}
+	.save-btn:hover {
+		background: var(--bg-hover);
+	}
+	.test-btn {
+		background: var(--color-accent, #07b9a3);
+		color: #fff;
+		border-color: transparent;
+	}
+	.test-btn:hover:not(:disabled) {
+		opacity: 0.85;
+	}
+	.test-btn:disabled {
+		opacity: 0.6;
+		cursor: default;
+	}
+	.test-ok {
+		font-size: 0.857rem;
+		color: var(--color-added, #3fb950);
+	}
+	.test-err {
+		font-size: 0.857rem;
+		color: var(--color-deleted, #f85149);
+		cursor: help;
 	}
 	.shortcuts {
 		font-size: 0.929rem;

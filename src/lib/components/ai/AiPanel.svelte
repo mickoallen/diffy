@@ -22,9 +22,9 @@
 		<button class="close-btn" onclick={() => (settingsStore.showAiPanel = false)}>×</button>
 	</div>
 
-	{#if !settingsStore.apiKey}
+	{#if !settingsStore.aiApiKey && settingsStore.aiProvider !== 'ollama' && settingsStore.aiProvider !== 'lmstudio'}
 		<div class="no-key">
-			<p>Configure your Claude API key in Settings to use AI features.</p>
+			<p>Configure your AI provider and API key in Settings to use AI features.</p>
 		</div>
 	{:else}
 		<div class="actions">

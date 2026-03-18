@@ -1,6 +1,19 @@
 import { aiSummarize, aiFlagIssues, aiExplainHunk } from '$lib/services/ai';
 import { settingsStore } from './settings.svelte';
 
+function getConfig() {
+	return {
+		provider: settingsStore.aiProvider,
+		apiKey: settingsStore.aiApiKey,
+		model: settingsStore.aiModel,
+		baseUrl: settingsStore.aiBaseUrl
+	};
+}
+
+function needsKey(): boolean {
+	return settingsStore.aiProvider !== 'ollama';
+}
+
 class AiStore {
 	summary = $state('');
 	issues = $state('');
@@ -9,14 +22,14 @@ class AiStore {
 	error = $state('');
 
 	async summarize(diffContent: string) {
-		if (!settingsStore.apiKey) {
+		if (needsKey() && !settingsStore.aiApiKey) {
 			this.error = 'API key not configured';
 			return;
 		}
 		this.loading = true;
 		this.error = '';
 		try {
-			this.summary = await aiSummarize(settingsStore.apiKey, diffContent);
+			this.summary = await aiSummarize(getConfig(), diffContent);
 		} catch (e) {
 			this.error = String(e);
 		} finally {
@@ -25,14 +38,14 @@ class AiStore {
 	}
 
 	async flagIssues(diffContent: string) {
-		if (!settingsStore.apiKey) {
+		if (needsKey() && !settingsStore.aiApiKey) {
 			this.error = 'API key not configured';
 			return;
 		}
 		this.loading = true;
 		this.error = '';
 		try {
-			this.issues = await aiFlagIssues(settingsStore.apiKey, diffContent);
+			this.issues = await aiFlagIssues(getConfig(), diffContent);
 		} catch (e) {
 			this.error = String(e);
 		} finally {
@@ -41,14 +54,14 @@ class AiStore {
 	}
 
 	async explainHunk(hunkContent: string) {
-		if (!settingsStore.apiKey) {
+		if (needsKey() && !settingsStore.aiApiKey) {
 			this.error = 'API key not configured';
 			return;
 		}
 		this.loading = true;
 		this.error = '';
 		try {
-			this.hunkExplanation = await aiExplainHunk(settingsStore.apiKey, hunkContent);
+			this.hunkExplanation = await aiExplainHunk(getConfig(), hunkContent);
 		} catch (e) {
 			this.error = String(e);
 		} finally {

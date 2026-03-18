@@ -14,6 +14,13 @@ pub fn list_branches(repo: &Repository) -> Result<Vec<BranchInfo>, String> {
         .as_ref()
         .and_then(|h| h.shorthand().map(|s| s.to_string()));
 
+    // Resolve origin/HEAD to find the default remote branch (e.g. "origin/main")
+    let default_remote: Option<String> = repo
+        .find_reference("refs/remotes/origin/HEAD")
+        .ok()
+        .and_then(|r| r.symbolic_target().map(|t| t.to_string()))
+        .and_then(|t| t.strip_prefix("refs/remotes/").map(|s| s.to_string()));
+
     let git_branches = repo
         .branches(None) // None = local + remote
         .map_err(|e| format!("Failed to list branches: {}", e))?;
@@ -42,21 +49,26 @@ pub fn list_branches(repo: &Repository) -> Result<Vec<BranchInfo>, String> {
         };
 
         let is_head = !is_remote && head_name.as_deref() == Some(&name);
+        let is_default = is_remote && default_remote.as_deref() == Some(&name);
 
         branches.push(BranchInfo {
             name,
             is_head,
             is_remote,
+            is_default,
             upstream,
         });
     }
 
-    // Sort: HEAD first, then local branches, then remote branches, all alphabetical
+    // Sort: HEAD first, then local branches, then remote branches (default first), all alphabetical
     branches.sort_by(|a, b| {
         b.is_head.cmp(&a.is_head)
             .then(a.is_remote.cmp(&b.is_remote))
+            .then(b.is_default.cmp(&a.is_default))
             .then(a.name.cmp(&b.name))
     });
+    const MAX_BRANCHES: usize = 500;
+    branches.truncate(MAX_BRANCHES);
     Ok(branches)
 }
 
@@ -83,6 +95,7 @@ pub fn get_commits_between(
         .hide(from_obj.id())
         .map_err(|e| format!("Failed to hide from revwalk: {}", e))?;
 
+    const MAX_COMMITS: usize = 1000;
     let mut commits = Vec::new();
     for oid in revwalk {
         let oid = oid.map_err(|e| format!("Revwalk error: {}", e))?;
@@ -96,6 +109,9 @@ pub fn get_commits_between(
             author: commit.author().name().unwrap_or("unknown").to_string(),
             time: commit.time().seconds(),
         });
+        if commits.len() >= MAX_COMMITS {
+            break;
+        }
     }
 
     Ok(commits)

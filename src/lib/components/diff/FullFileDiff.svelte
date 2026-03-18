@@ -4,7 +4,7 @@
 	import { getFileContent } from '$lib/services/git';
 	import { diffStore } from '$lib/stores/diff.svelte';
 	import { repoStore } from '$lib/stores/repo.svelte';
-	import { highlightLine } from '$lib/utils/highlighter';
+	import { highlightLines } from '$lib/utils/highlighter';
 	import { settingsStore } from '$lib/stores/settings.svelte';
 	import DiffHeader from './DiffHeader.svelte';
 	import DiffLineRow from './DiffLine.svelte';
@@ -36,13 +36,9 @@
 		const lines = displayLines;
 		const path = file.path;
 		const theme = settingsStore.isDark ? 'dark' : 'light';
-		const result: string[] = new Array(lines.length).fill('');
-		highlightedLines = result;
-		lines.forEach((line, i) => {
-			highlightLine(line.content, path, theme).then((html) => {
-				result[i] = html;
-				highlightedLines = result.slice();
-			});
+		highlightedLines = new Array(lines.length).fill('');
+		highlightLines(lines.map(l => l.content), path, theme).then(result => {
+			highlightedLines = result;
 		});
 	});
 
@@ -117,13 +113,15 @@
 	{:else if error}
 		<div class="status error">{error}</div>
 	{:else}
-		<table class="diff-table">
-			<tbody>
-				{#each displayLines as line, i}
-					<DiffLineRow {line} highlighted={highlightedLines[i]} />
-				{/each}
-			</tbody>
-		</table>
+		<div class="diff-table-wrapper">
+			<table class="diff-table">
+				<tbody>
+					{#each displayLines as line, i}
+						<DiffLineRow {line} highlighted={highlightedLines[i]} />
+					{/each}
+				</tbody>
+			</table>
+		</div>
 	{/if}
 </div>
 <ScrollMap lines={displayLines} {scrollEl} />
@@ -133,8 +131,10 @@
 		border: 1px solid var(--border);
 		border-radius: 6px;
 		overflow: hidden;
-		width: max-content;
-		min-width: 100%;
+		width: 100%;
+	}
+	.diff-table-wrapper {
+		overflow-x: auto;
 	}
 	.diff-table {
 		width: max-content;

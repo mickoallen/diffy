@@ -1,4 +1,3 @@
-import { flushSync } from 'svelte';
 import {
 	getBranchToWorkdirSummary,
 	getBranchToWorkdirFileDiff,
@@ -30,7 +29,7 @@ class DiffStore {
 	fullFileContent = $state<string | null>(null);
 
 	localChangesCount = $state(0);
-	// updated separately to reflect uncommitted-only count (for badge display)
+	pendingWorkdirChange = $state(false);
 
 	loading = $state(false);
 	fileLoading = $state(false);
@@ -50,6 +49,7 @@ class DiffStore {
 		this.selectedRepoFile = null;
 		this.fullFileContent = null;
 		this.localChangesCount = 0;
+		this.pendingWorkdirChange = false;
 		this.loading = false;
 		this.fileLoading = false;
 		this.error = '';
@@ -66,13 +66,19 @@ class DiffStore {
 	}
 
 	// toRef is the base/target branch (e.g. "main"); diffs against working directory
+	async reload() {
+		if (this.fromRef && this.toRef) {
+			await this.loadBranchDiff(this.fromRef, this.toRef);
+		}
+	}
+
 	async loadBranchDiff(fromRef: string, toRef: string) {
-		flushSync(() => { this.loading = true; });
-		await new Promise<void>(r => requestAnimationFrame(() => r()));
+		this.loading = true;
 		this.error = '';
 		this.fromRef = fromRef;
 		this.toRef = toRef;
 		try {
+			this.pendingWorkdirChange = false;
 			this.summary = await getBranchToWorkdirSummary(repoStore.path, toRef);
 			this.selectedFile = null;
 			this.fileDiff = null;

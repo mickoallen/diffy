@@ -134,6 +134,36 @@ function getLangFromPath(path: string): string {
 	return map[ext] ?? 'text';
 }
 
+export async function highlightLines(
+	lines: string[],
+	filePath: string,
+	theme: 'dark' | 'light'
+): Promise<string[]> {
+	const hl = await getHighlighter();
+	const lang = getLangFromPath(filePath);
+	const themeName = theme === 'dark' ? 'github-dark' : 'github-light';
+	return lines.map((content) => {
+		const cacheKey = `${filePath}:${content}:${theme}`;
+		if (cache.has(cacheKey)) return cache.get(cacheKey)!;
+		try {
+			const tokens = hl.codeToTokens(content, { lang: lang as BundledLanguage, theme: themeName });
+			const html = tokens.tokens[0]
+				?.map((t) => {
+					const esc = t.content
+						.replace(/&/g, '&amp;')
+						.replace(/</g, '&lt;')
+						.replace(/>/g, '&gt;');
+					return `<span style="color:${t.color ?? ''}">${esc}</span>`;
+				})
+				.join('');
+			cache.set(cacheKey, html ?? content);
+			return html ?? content;
+		} catch {
+			return content;
+		}
+	});
+}
+
 export async function highlightLine(
 	content: string,
 	filePath: string,

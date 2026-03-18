@@ -16,6 +16,8 @@
 	import MainPanel from '$lib/components/layout/MainPanel.svelte';
 	import AiPanel from '$lib/components/ai/AiPanel.svelte';
 	import SettingsModal from '$lib/components/layout/SettingsModal.svelte';
+	import DebugModal from '$lib/components/layout/DebugModal.svelte';
+	import { debugStore } from '$lib/stores/debug.svelte';
 
 	let repoPath = $state('');
 	let remoteUrl = $state('');
@@ -24,22 +26,40 @@
 
 	let cleanupKeyboard: (() => void) | undefined;
 
+	function onKeydown(e: KeyboardEvent) {
+		if (e.key === '`') debugStore.toggle();
+		if (e.key === 'Escape') debugStore.show = false;
+	}
+
 	onMount(async () => {
-		await settingsStore.load();
+		debugStore.install();
+		console.log('onMount: start');
 		cleanupKeyboard = setupKeyboardShortcuts();
 
+		// Load settings in parallel — don't block the rest of init.
+		settingsStore.load().then(() => console.log('onMount: settings loaded')).catch(() => {});
+
+		let gitStateTimer: ReturnType<typeof setTimeout> | undefined;
 		listen<{ kind: string }>('git://refresh', async (event) => {
-			if (!repoOpened || diffStore.loading) return;
+			if (!repoOpened) return;
 			const { kind } = event.payload;
+			console.log(`git://refresh event: ${kind}`);
 			if (kind === 'git-state') {
-				const prevBranch = repoStore.currentBranch;
-				await repoStore.refreshBranches();
-				if (repoStore.currentBranch !== prevBranch) {
-					diffStore.fromRef = repoStore.currentBranch;
-				}
-				await reloadCurrentDiff();
+				clearTimeout(gitStateTimer);
+				gitStateTimer = setTimeout(async () => {
+					if (diffStore.loading) return;
+					const prevBranch = repoStore.currentBranch;
+					await repoStore.refreshBranches();
+					if (repoStore.currentBranch !== prevBranch) {
+						diffStore.fromRef = repoStore.currentBranch;
+					}
+					await reloadCurrentDiff();
+				}, 300);
 			} else if (kind === 'workdir') {
-				await reloadCurrentDiff();
+				// Don't do a full diff reload on every file save — just update the badge.
+				// The user can hit the refresh button to reload the diff manually.
+				diffStore.pendingWorkdirChange = true;
+				await diffStore.refreshLocalChanges();
 			}
 		}).then((fn) => { unlistenRefresh = fn; });
 	});
@@ -60,7 +80,7 @@
 	}
 
 	async function reloadCurrentDiff() {
-		if (diffStore.fromRef && diffStore.toRef) {
+		if (repoOpened && diffStore.fromRef && diffStore.toRef) {
 			await diffStore.loadBranchDiff(diffStore.fromRef, diffStore.toRef);
 		}
 	}
@@ -69,28 +89,41 @@
 		const target = (path ?? repoPath).trim();
 		if (!target) return;
 		repoPath = target;
-		await repoStore.open(target);
-		if (!repoStore.error) {
-			recentsStore.add(target);
-			remoteUrl = await getRemoteUrl(target).catch(() => '');
-			repoOpened = true;
-			invoke('start_watching', { path: target }).catch(() => {});
-			const fromRef = repoStore.currentBranch;
-			let toRef = await getDefaultBranch(repoPath).catch(() => '');
-			if (!toRef || toRef === fromRef) {
-				toRef = fallbackDefaultTarget(repoStore.branches, fromRef);
+		console.log(`handleOpenRepo: start "${target}"`);
+		try {
+			console.log('handleOpenRepo: calling repoStore.open');
+			await repoStore.open(target);
+			console.log(`handleOpenRepo: repoStore.open done, error="${repoStore.error}"`);
+			if (!repoStore.error) {
+				recentsStore.add(target);
+				remoteUrl = await getRemoteUrl(target).catch(() => '');
+				repoOpened = true;
+				invoke('start_watching', { path: target }).catch(() => {});
+				const fromRef = repoStore.currentBranch;
+				console.log(`handleOpenRepo: loading diff fromRef="${fromRef}"`);
+				let toRef = await getDefaultBranch(repoPath).catch(() => '');
+				if (!toRef || toRef === fromRef) {
+					toRef = fallbackDefaultTarget(repoStore.branches, fromRef);
+				}
+				console.log(`handleOpenRepo: toRef="${toRef}", calling loadBranchDiff`);
+				await diffStore.loadBranchDiff(fromRef, toRef);
+				console.log('handleOpenRepo: done');
 			}
-			await diffStore.loadBranchDiff(fromRef, toRef);
+		} catch (e) {
+			repoStore.loading = false;
+			diffStore.loading = false;
+			repoStore.error = String(e);
+			console.error(`handleOpenRepo: caught error: ${e}`);
 		}
 	}
 
 	function handleCloseRepo() {
-		invoke('stop_watching').catch(() => {});
-		repoStore.reset();
-		diffStore.reset();
 		repoOpened = false;
 		repoPath = '';
 		remoteUrl = '';
+		repoStore.reset();
+		diffStore.reset();
+		invoke('stop_watching').catch(() => {});
 	}
 
 	async function handleTargetChange(v: string) {
@@ -98,6 +131,8 @@
 		await reloadCurrentDiff();
 	}
 </script>
+
+<svelte:window onkeydown={onKeydown} />
 
 {#if !repoOpened}
 	<div class="welcome">
@@ -188,6 +223,18 @@
 			<div class="top-actions">
 				<button
 					class="icon-btn"
+					class:pending={diffStore.pendingWorkdirChange}
+					class:spinning={diffStore.loading}
+					onclick={() => diffStore.reload()}
+					title="Refresh diff (r)"
+					disabled={diffStore.loading}
+				>
+					<svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+						<path d="M1 7A6 6 0 0 1 12.5 4M13 1v3h-3M13 7A6 6 0 0 1 1.5 10M1 13v-3h3"/>
+					</svg>
+				</button>
+				<button
+					class="icon-btn"
 					class:active={settingsStore.showAiPanel}
 					onclick={() => settingsStore.toggleAiPanel()}
 					title="AI Panel (a)"
@@ -239,7 +286,13 @@
 	</div>
 {/if}
 
-<SettingsModal />
+{#if settingsStore.showSettings}
+	<SettingsModal />
+{/if}
+
+{#if debugStore.show}
+	<DebugModal />
+{/if}
 
 <style>
 	.welcome {
@@ -596,7 +649,7 @@
 		cursor: pointer;
 		transition: color 0.15s, background 0.15s, border-color 0.15s;
 	}
-	.icon-btn:hover {
+	.icon-btn:hover:not(:disabled) {
 		color: var(--text-primary);
 		background: var(--bg-tertiary);
 		border-color: var(--border);
@@ -605,6 +658,16 @@
 		color: var(--color-accent);
 		background: var(--bg-tertiary);
 		border-color: var(--color-accent);
+	}
+	.icon-btn.pending {
+		color: var(--color-mod, #fa8208);
+	}
+	.icon-btn.spinning svg {
+		animation: spin 0.8s linear infinite;
+	}
+	.icon-btn:disabled {
+		opacity: 0.5;
+		cursor: default;
 	}
 	.content {
 		flex: 1;
@@ -624,6 +687,7 @@
 		color: var(--text-muted);
 		font-size: 0.929rem;
 		z-index: 50;
+		pointer-events: none;
 	}
 	.spinner {
 		width: 28px;

@@ -9,7 +9,7 @@
 	 *   loading   — true while fetching file content
 	 *   onExpand  — called when user first clicks expand (triggers lazy load)
 	 */
-	import { highlightLine } from '$lib/utils/highlighter';
+	import { highlightLines } from '$lib/utils/highlighter';
 	import { settingsStore } from '$lib/stores/settings.svelte';
 
 	const EXPAND_AMOUNT = 10;
@@ -49,17 +49,16 @@
 		fileLines ? fileLines.slice(bottomOffset - 1, bottomOffset - 1 + expandedBottom) : []
 	);
 
-	let highlightedTop = $state<Record<number, string>>({});
-	let highlightedBottom = $state<Record<number, string>>({});
+	let highlightedTop = $state<string[]>([]);
+	let highlightedBottom = $state<string[]>([]);
 
 	$effect(() => {
 		const lines = topLines;
 		const path = filePath;
 		const theme = settingsStore.isDark ? 'dark' : 'light';
-		lines.forEach((content, i) => {
-			highlightLine(content, path, theme).then((html) => {
-				highlightedTop[i] = html;
-			});
+		if (lines.length === 0) { highlightedTop = []; return; }
+		highlightLines(lines, path, theme).then(result => {
+			highlightedTop = result;
 		});
 	});
 
@@ -67,10 +66,9 @@
 		const lines = bottomLines;
 		const path = filePath;
 		const theme = settingsStore.isDark ? 'dark' : 'light';
-		lines.forEach((content, i) => {
-			highlightLine(content, path, theme).then((html) => {
-				highlightedBottom[i] = html;
-			});
+		if (lines.length === 0) { highlightedBottom = []; return; }
+		highlightLines(lines, path, theme).then(result => {
+			highlightedBottom = result;
 		});
 	});
 

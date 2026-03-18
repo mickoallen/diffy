@@ -3,6 +3,7 @@ import { load as loadStore } from '@tauri-apps/plugin-store';
 export type Theme = 'void' | 'abyss' | 'chalk' | 'nate';
 export type Font = 'system' | 'jetbrains' | 'fira' | 'ibm';
 export type Scale = 'compact' | 'default' | 'relaxed' | 'large';
+export type AiProvider = 'claude' | 'openai' | 'gemini' | 'ollama' | 'lmstudio';
 
 const SCALE_VALUES: Record<Scale, string> = {
 	compact: '13px',
@@ -15,7 +16,10 @@ class SettingsStore {
 	theme = $state<Theme>('void');
 	font = $state<Font>('system');
 	scale = $state<Scale>('default');
-	apiKey = $state('');
+	aiApiKey = $state('');
+	aiProvider = $state<AiProvider>('claude');
+	aiModel = $state('claude-sonnet-4-6');
+	aiBaseUrl = $state('http://localhost:11434');
 	showAiPanel = $state(false);
 	showSettings = $state(false);
 	fileFilter = $state('');
@@ -60,12 +64,18 @@ class SettingsStore {
 			const theme = (await store.get<Theme>('theme')) ?? 'void';
 			const font = (await store.get<Font>('font')) ?? 'system';
 			const scale = (await store.get<Scale>('scale')) ?? 'default';
-			const apiKey = (await store.get<string>('apiKey')) ?? '';
+			const aiApiKey = (await store.get<string>('aiApiKey')) ?? '';
+			const aiProvider = (await store.get<AiProvider>('aiProvider')) ?? 'claude';
+			const aiModel = (await store.get<string>('aiModel')) ?? 'claude-sonnet-4-6';
+			const aiBaseUrl = (await store.get<string>('aiBaseUrl')) ?? 'http://localhost:11434';
 
 			this.theme = theme;
 			this.font = font;
 			this.scale = scale;
-			this.apiKey = apiKey;
+			this.aiApiKey = aiApiKey;
+			this.aiProvider = aiProvider;
+			this.aiModel = aiModel;
+			this.aiBaseUrl = aiBaseUrl;
 
 			this.applyTheme(theme);
 			this.applyFont(font);
@@ -84,7 +94,10 @@ class SettingsStore {
 			await store.set('theme', this.theme);
 			await store.set('font', this.font);
 			await store.set('scale', this.scale);
-			await store.set('apiKey', this.apiKey);
+			await store.set('aiApiKey', this.aiApiKey);
+			await store.set('aiProvider', this.aiProvider);
+			await store.set('aiModel', this.aiModel);
+			await store.set('aiBaseUrl', this.aiBaseUrl);
 			await store.save();
 		} catch {
 			// Ignore save errors

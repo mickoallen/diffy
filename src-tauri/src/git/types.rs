@@ -64,6 +64,7 @@ pub struct BranchInfo {
     pub name: String,
     pub is_head: bool,
     pub is_remote: bool,
+    pub is_default: bool,
     pub upstream: Option<String>,
 }
 

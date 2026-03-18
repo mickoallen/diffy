@@ -82,8 +82,7 @@
 		border: 1px solid var(--border);
 		border-radius: 6px;
 		overflow: hidden;
-		width: max-content;
-		min-width: 100%;
+		width: 100%;
 	}
 	.empty {
 		padding: 24px;

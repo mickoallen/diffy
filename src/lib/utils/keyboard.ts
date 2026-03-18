@@ -1,5 +1,6 @@
 import { diffStore } from '$lib/stores/diff.svelte';
 import { settingsStore } from '$lib/stores/settings.svelte';
+import { debugStore } from '$lib/stores/debug.svelte';
 
 export function setupKeyboardShortcuts() {
 	function handler(e: KeyboardEvent) {
@@ -25,12 +26,19 @@ export function setupKeyboardShortcuts() {
 			case 'a':
 				settingsStore.toggleAiPanel();
 				break;
+			case 'r':
+				diffStore.reload();
+				break;
 			case 'f':
 				e.preventDefault();
 				document.getElementById('file-filter')?.focus();
 				break;
 			case 'Escape':
 				settingsStore.showSettings = false;
+				debugStore.show = false;
+				break;
+			case '`':
+				debugStore.toggle();
 				break;
 		}
 	}

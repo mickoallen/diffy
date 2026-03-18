@@ -1,4 +1,3 @@
-import { flushSync } from 'svelte';
 import { listBranches, openRepo, type BranchInfo } from '$lib/services/git';
 
 class RepoStore {
@@ -10,8 +9,7 @@ class RepoStore {
 	currentBranch = $derived(this.branches.find((b) => b.is_head)?.name ?? '');
 
 	async open(path: string) {
-		flushSync(() => { this.loading = true; });
-		await new Promise<void>(r => requestAnimationFrame(() => r()));
+		this.loading = true;
 		this.error = '';
 		try {
 			this.path = await openRepo(path);

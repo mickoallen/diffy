@@ -74,7 +74,7 @@
 							onclick={() => select(branch.name)}
 							type="button"
 						>
-							{branch.name}
+							{branch.name}{branch.is_default ? ' ★' : ''}
 						</button>
 					{/each}
 				{/if}

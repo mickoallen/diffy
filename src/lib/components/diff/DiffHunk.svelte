@@ -1,7 +1,7 @@
 <script lang="ts">
 	import type { Hunk } from '$lib/services/git';
 	import DiffLine from './DiffLine.svelte';
-	import { highlightLine } from '$lib/utils/highlighter';
+	import { highlightLines } from '$lib/utils/highlighter';
 	import { settingsStore } from '$lib/stores/settings.svelte';
 
 	interface Props {
@@ -12,17 +12,15 @@
 
 	let { hunk, filePath, onExplain }: Props = $props();
 
-	let highlighted = $state<Record<number, string>>({});
+	let highlighted = $state<string[]>([]);
 
 	$effect(() => {
 		const currentHunk = hunk;
 		const currentPath = filePath;
 		const currentTheme = settingsStore.isDark ? 'dark' : 'light';
-		highlighted = {};
-		currentHunk.lines.forEach((line, i) => {
-			highlightLine(line.content, currentPath, currentTheme).then((html) => {
-				highlighted[i] = html;
-			});
+		highlighted = [];
+		highlightLines(currentHunk.lines.map(l => l.content), currentPath, currentTheme).then(result => {
+			highlighted = result;
 		});
 	});
 
@@ -43,13 +41,15 @@
 			</button>
 		{/if}
 	</div>
-	<table class="hunk-table">
-		<tbody>
-			{#each hunk.lines as line, i}
-				<DiffLine {line} highlighted={highlighted[i]} />
-			{/each}
-		</tbody>
-	</table>
+	<div class="hunk-body">
+		<table class="hunk-table">
+			<tbody>
+				{#each hunk.lines as line, i}
+					<DiffLine {line} highlighted={highlighted[i]} />
+				{/each}
+			</tbody>
+		</table>
+	</div>
 </div>
 
 <style>
@@ -78,6 +78,9 @@
 	}
 	.explain-btn:hover {
 		background: var(--bg-hover);
+	}
+	.hunk-body {
+		overflow-x: auto;
 	}
 	.hunk-table {
 		width: max-content;

@@ -11,6 +11,11 @@
     %sveltekit.head%
   </head>
   <body data-sveltekit-preload-data="hover">
+    <script>
+      // Force webview to accept mouse input on macOS — without this,
+      // the first click only activates the window and is swallowed.
+      document.addEventListener('mousedown', function() { window.focus(); }, { capture: true });
+    </script>
     <div style="display: contents">%sveltekit.body%</div>
   </body>
 </html>

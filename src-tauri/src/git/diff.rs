@@ -197,7 +197,8 @@ pub fn get_file_content(repo: &Repository, ref_name: &str, file_path: &str) -> R
     let blob = repo
         .find_blob(entry.id())
         .map_err(|e| format!("Failed to get blob: {}", e))?;
-    if blob.is_binary() {
+    const MAX_FILE_SIZE: usize = 2 * 1024 * 1024; // 2 MB
+    if blob.is_binary() || blob.size() > MAX_FILE_SIZE {
         return Ok(vec![]);
     }
     let content = std::str::from_utf8(blob.content())
