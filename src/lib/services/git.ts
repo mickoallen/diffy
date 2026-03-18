@@ -21,6 +21,7 @@ export interface FileSummary {
 	status: 'Added' | 'Deleted' | 'Modified' | 'Renamed';
 	additions: number;
 	deletions: number;
+	is_binary: boolean;
 }
 
 export interface DiffSummary {
@@ -51,6 +52,7 @@ export interface FileDiff {
 	status: 'Added' | 'Deleted' | 'Modified' | 'Renamed';
 	additions: number;
 	deletions: number;
+	is_binary: boolean;
 	hunks: Hunk[];
 }
 

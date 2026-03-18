@@ -191,10 +191,14 @@
 						{/if}
 						<span class="name">{node.name}</span>
 						{#if diffFile}
-							<span class="stats">
-								{#if diffFile.additions > 0}<span class="add">+{diffFile.additions}</span>{/if}
-								{#if diffFile.deletions > 0}<span class="del">-{diffFile.deletions}</span>{/if}
-							</span>
+							{#if diffFile.is_binary}
+								<span class="binary-badge">BIN</span>
+							{:else}
+								<span class="stats">
+									{#if diffFile.additions > 0}<span class="add">+{diffFile.additions}</span>{/if}
+									{#if diffFile.deletions > 0}<span class="del">-{diffFile.deletions}</span>{/if}
+								</span>
+							{/if}
 						{/if}
 					</button>
 				{:else}
@@ -405,5 +409,16 @@
 	.del {
 		color: var(--color-del);
 		margin-left: 4px;
+	}
+	.binary-badge {
+		font-size: 0.714rem;
+		font-family: var(--font-mono);
+		font-weight: 600;
+		color: var(--text-muted);
+		background: var(--bg-tertiary);
+		border: 1px solid var(--border);
+		border-radius: 3px;
+		padding: 0 4px;
+		flex-shrink: 0;
 	}
 </style>

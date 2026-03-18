@@ -1,7 +1,16 @@
 import { createHighlighter, type Highlighter, type BundledLanguage } from 'shiki';
 
 let highlighter: Highlighter | null = null;
+const LRU_MAX = 2000;
 const cache = new Map<string, string>();
+
+function cacheSet(key: string, value: string) {
+	if (cache.size >= LRU_MAX) {
+		const oldest = cache.keys().next().value!;
+		cache.delete(oldest);
+	}
+	cache.set(key, value);
+}
 
 export async function getHighlighter(): Promise<Highlighter> {
 	if (!highlighter) {
@@ -156,7 +165,7 @@ export async function highlightLines(
 					return `<span style="color:${t.color ?? ''}">${esc}</span>`;
 				})
 				.join('');
-			cache.set(cacheKey, html ?? content);
+			cacheSet(cacheKey, html ?? content);
 			return html ?? content;
 		} catch {
 			return content;
@@ -187,7 +196,7 @@ export async function highlightLine(
 				return `<span style="color:${token.color ?? ''}">${escaped}</span>`;
 			})
 			.join('');
-		cache.set(cacheKey, html ?? content);
+		cacheSet(cacheKey, html ?? content);
 		return html ?? content;
 	} catch {
 		return content;

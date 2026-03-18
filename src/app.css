@@ -172,3 +172,14 @@ body {
 	background: var(--color-accent);
 	color: white;
 }
+
+/* Search highlights */
+.search-highlight {
+	background: rgba(255, 213, 79, 0.4);
+	color: inherit;
+	border-radius: 2px;
+}
+.search-highlight.current {
+	background: rgba(255, 213, 79, 0.8);
+	outline: 2px solid #ffd54f;
+}

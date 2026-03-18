@@ -22,6 +22,7 @@ class SettingsStore {
 	aiBaseUrl = $state('http://localhost:11434');
 	showAiPanel = $state(false);
 	showSettings = $state(false);
+	showShortcuts = $state(false);
 	fileFilter = $state('');
 
 	get isDark(): boolean {

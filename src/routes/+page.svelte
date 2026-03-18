@@ -17,6 +17,7 @@
 	import AiPanel from '$lib/components/ai/AiPanel.svelte';
 	import SettingsModal from '$lib/components/layout/SettingsModal.svelte';
 	import DebugModal from '$lib/components/layout/DebugModal.svelte';
+	import ShortcutSheet from '$lib/components/layout/ShortcutSheet.svelte';
 	import { debugStore } from '$lib/stores/debug.svelte';
 
 	let repoPath = $state('');
@@ -293,6 +294,8 @@
 {#if debugStore.show}
 	<DebugModal />
 {/if}
+
+<ShortcutSheet />
 
 <style>
 	.welcome {

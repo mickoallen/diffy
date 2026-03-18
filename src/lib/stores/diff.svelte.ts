@@ -34,6 +34,12 @@ class DiffStore {
 	loading = $state(false);
 	fileLoading = $state(false);
 	error = $state('');
+	retryAction = $state<(() => void) | null>(null);
+
+	searchOpen = $state(false);
+	searchQuery = $state('');
+	currentMatchIndex = $state(0);
+	searchMatchCount = $state(0);
 
 	selectedFileIndex = $derived(
 		this.summary?.files.findIndex((f) => f.path === this.selectedFile?.path) ?? -1
@@ -53,6 +59,7 @@ class DiffStore {
 		this.loading = false;
 		this.fileLoading = false;
 		this.error = '';
+		this.retryAction = null;
 		this.treeMode = 'diffs';
 	}
 
@@ -87,6 +94,7 @@ class DiffStore {
 			}
 		} catch (e) {
 			this.error = String(e);
+			this.retryAction = () => this.loadBranchDiff(fromRef, toRef);
 		} finally {
 			this.loading = false;
 		}
@@ -99,6 +107,7 @@ class DiffStore {
 			this.fileDiff = await getBranchToWorkdirFileDiff(repoStore.path, this.toRef, file.path);
 		} catch (e) {
 			this.error = String(e);
+			this.retryAction = () => this.selectFile(file);
 		} finally {
 			this.fileLoading = false;
 		}
@@ -147,6 +156,44 @@ class DiffStore {
 		if (mode === 'all' && this.allFiles.length === 0) {
 			await this.loadAllFiles();
 		}
+	}
+
+	openSearch() {
+		this.searchOpen = true;
+	}
+
+	closeSearch() {
+		this.searchOpen = false;
+		this.searchQuery = '';
+		this.currentMatchIndex = 0;
+		this.searchMatchCount = 0;
+	}
+
+	nextMatch() {
+		if (this.searchMatchCount > 0) {
+			this.currentMatchIndex = (this.currentMatchIndex + 1) % this.searchMatchCount;
+			this.scrollToCurrentMatch();
+		}
+	}
+
+	prevMatch() {
+		if (this.searchMatchCount > 0) {
+			this.currentMatchIndex = (this.currentMatchIndex - 1 + this.searchMatchCount) % this.searchMatchCount;
+			this.scrollToCurrentMatch();
+		}
+	}
+
+	scrollToCurrentMatch() {
+		setTimeout(() => {
+			const marks = document.querySelectorAll('.search-highlight');
+			const current = marks[this.currentMatchIndex];
+			if (current) {
+				current.scrollIntoView({ block: 'center', behavior: 'smooth' });
+				// Remove previous current highlight
+				document.querySelector('.search-highlight.current')?.classList.remove('current');
+				current.classList.add('current');
+			}
+		}, 0);
 	}
 
 	toggleViewMode() {

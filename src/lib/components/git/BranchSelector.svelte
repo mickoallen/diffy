@@ -11,13 +11,57 @@
 
 	let open = $state(false);
 	let buttonEl = $state<HTMLButtonElement | null>(null);
+	let filterInputEl = $state<HTMLInputElement | null>(null);
+	let filter = $state('');
+	let highlightedIndex = $state(-1);
 
 	const localBranches = $derived(repoStore.branches.filter(b => !b.is_remote));
 	const remoteBranches = $derived(repoStore.branches.filter(b => b.is_remote));
 
+	const filteredLocal = $derived(
+		localBranches.filter(b => b.name.toLowerCase().includes(filter.toLowerCase()))
+	);
+	const filteredRemote = $derived(
+		remoteBranches.filter(b => b.name.toLowerCase().includes(filter.toLowerCase()))
+	);
+	const allFiltered = $derived([...filteredLocal, ...filteredRemote]);
+
+	$effect(() => {
+		if (open) {
+			filter = '';
+			highlightedIndex = -1;
+			// Focus filter input after DOM update
+			setTimeout(() => filterInputEl?.focus(), 0);
+		}
+	});
+
 	function select(name: string) {
 		open = false;
 		onchange(name);
+	}
+
+	function handleMenuKeydown(e: KeyboardEvent) {
+		if (e.key === 'ArrowDown') {
+			e.preventDefault();
+			highlightedIndex = (highlightedIndex + 1) % allFiltered.length;
+			scrollHighlightedIntoView();
+		} else if (e.key === 'ArrowUp') {
+			e.preventDefault();
+			highlightedIndex = highlightedIndex <= 0 ? allFiltered.length - 1 : highlightedIndex - 1;
+			scrollHighlightedIntoView();
+		} else if (e.key === 'Enter') {
+			e.preventDefault();
+			if (highlightedIndex >= 0 && highlightedIndex < allFiltered.length) {
+				select(allFiltered[highlightedIndex].name);
+			}
+		}
+	}
+
+	function scrollHighlightedIntoView() {
+		setTimeout(() => {
+			const el = document.querySelector('.branch-menu .item.highlighted');
+			el?.scrollIntoView({ block: 'nearest' });
+		}, 0);
 	}
 
 	function onkeydown(e: KeyboardEvent) {
@@ -50,13 +94,24 @@
 		</button>
 
 		{#if open}
-			<div class="menu">
-				{#if localBranches.length > 0}
+			<!-- svelte-ignore a11y_no_static_element_interactions -->
+			<div class="menu branch-menu" onkeydown={handleMenuKeydown}>
+				<div class="filter-row">
+					<input
+						bind:this={filterInputEl}
+						type="text"
+						class="branch-filter"
+						placeholder="Filter branches..."
+						bind:value={filter}
+					/>
+				</div>
+				{#if filteredLocal.length > 0}
 					<div class="group-label">Local</div>
-					{#each localBranches as branch}
+					{#each filteredLocal as branch, i}
 						<button
 							class="item"
 							class:active={branch.name === value}
+							class:highlighted={highlightedIndex === i}
 							onclick={() => select(branch.name)}
 							type="button"
 						>
@@ -64,13 +119,14 @@
 						</button>
 					{/each}
 				{/if}
-				{#if remoteBranches.length > 0}
-					{#if localBranches.length > 0}<div class="divider"></div>{/if}
+				{#if filteredRemote.length > 0}
+					{#if filteredLocal.length > 0}<div class="divider"></div>{/if}
 					<div class="group-label">Remote</div>
-					{#each remoteBranches as branch}
+					{#each filteredRemote as branch, i}
 						<button
 							class="item"
 							class:active={branch.name === value}
+							class:highlighted={highlightedIndex === filteredLocal.length + i}
 							onclick={() => select(branch.name)}
 							type="button"
 						>
@@ -181,5 +237,26 @@
 	.item.active {
 		background: var(--bg-active);
 		color: var(--color-accent);
+	}
+	.item.highlighted {
+		background: var(--bg-hover);
+	}
+	.filter-row {
+		padding: 4px;
+		border-bottom: 1px solid var(--border);
+	}
+	.branch-filter {
+		width: 100%;
+		padding: 4px 8px;
+		border-radius: 4px;
+		border: 1px solid var(--border);
+		background: var(--bg-primary);
+		color: var(--text-primary);
+		font-size: 0.857rem;
+		box-sizing: border-box;
+	}
+	.branch-filter:focus {
+		outline: 2px solid var(--color-accent);
+		outline-offset: -1px;
 	}
 </style>

@@ -243,12 +243,15 @@ fn extract_file_summaries(diff: &Diff) -> Result<Vec<FileSummary>, String> {
                 None
             };
 
+            let is_binary = delta.old_file().is_binary() || delta.new_file().is_binary();
+
             FileSummary {
                 path,
                 old_path,
                 status: delta_to_status(delta.status()),
                 additions: 0,
                 deletions: 0,
+                is_binary,
             }
         })
         .collect();
@@ -307,12 +310,14 @@ fn extract_file_diff(diff: &Diff, file_path: &str) -> Result<FileDiff, String> {
     let mut current_new_lines = 0u32;
     let mut file_status = FileStatus::Modified;
     let mut file_old_path: Option<String> = None;
+    let mut file_is_binary = false;
     let mut total_adds = 0usize;
     let mut total_dels = 0usize;
 
     diff.print(git2::DiffFormat::Patch, |delta, hunk, line| {
         // Capture file info from delta
         file_status = delta_to_status(delta.status());
+        file_is_binary = delta.old_file().is_binary() || delta.new_file().is_binary();
         if delta.status() == Delta::Renamed {
             file_old_path = delta
                 .old_file()
@@ -387,6 +392,7 @@ fn extract_file_diff(diff: &Diff, file_path: &str) -> Result<FileDiff, String> {
         status: file_status,
         additions: total_adds,
         deletions: total_dels,
+        is_binary: file_is_binary,
         hunks,
     })
 }

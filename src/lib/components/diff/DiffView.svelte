@@ -7,6 +7,7 @@
 	import UnifiedDiff from './UnifiedDiff.svelte';
 	import SplitDiff from './SplitDiff.svelte';
 	import FullFileDiff from './FullFileDiff.svelte';
+	import SearchBar from './SearchBar.svelte';
 	import { marked } from 'marked';
 	import { convertFileSrc } from '@tauri-apps/api/core';
 
@@ -70,6 +71,7 @@
 </script>
 
 <div class="diff-view">
+	<SearchBar />
 	{#if diffStore.fileLoading}
 		<div class="loading">Loading...</div>
 	{:else if diffStore.treeMode === 'all' && diffStore.fullFileContent !== null && diffStore.fileDiff === null}
@@ -113,7 +115,12 @@
 			<FullFileDiff file={diffStore.fileDiff} />
 		{/if}
 	{:else if diffStore.error}
-		<div class="error">{diffStore.error}</div>
+		<div class="error">
+			{diffStore.error}
+			{#if diffStore.retryAction}
+				<button class="retry-btn" onclick={() => diffStore.retryAction?.()}>Retry</button>
+			{/if}
+		</div>
 	{:else if diffStore.summary && diffStore.summary.files.length === 0}
 		<div class="empty">
 			<svg width="32" height="32" viewBox="0 0 32 32" fill="none" style="opacity:0.3;margin-bottom:12px">
@@ -170,6 +177,24 @@
 		background: var(--diff-del-bg);
 		border-radius: 6px;
 		margin: 16px;
+		display: flex;
+		align-items: center;
+		gap: 12px;
+	}
+	.retry-btn {
+		padding: 4px 12px;
+		border-radius: 4px;
+		border: 1px solid var(--color-del);
+		background: transparent;
+		color: var(--color-del);
+		font-size: 0.857rem;
+		font-weight: 500;
+		cursor: pointer;
+		flex-shrink: 0;
+	}
+	.retry-btn:hover {
+		background: var(--color-del);
+		color: white;
 	}
 	.full-file {
 		display: flex;

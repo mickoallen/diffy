@@ -1,5 +1,6 @@
 <script lang="ts">
 	import type { DiffLine } from '$lib/services/git';
+	import { diffStore } from '$lib/stores/diff.svelte';
 
 	interface Props {
 		line: DiffLine;
@@ -7,6 +8,25 @@
 	}
 
 	let { line, highlighted = '' }: Props = $props();
+
+	let searchHighlighted = $derived.by(() => {
+		const query = diffStore.searchQuery;
+		if (!query) return '';
+		const content = highlighted || line.content;
+		const lower = content.toLowerCase();
+		const qLower = query.toLowerCase();
+		let idx = 0;
+		let result = '';
+		let pos = 0;
+		while ((idx = lower.indexOf(qLower, pos)) !== -1) {
+			result += content.slice(pos, idx);
+			result += `<mark class="search-highlight">${content.slice(idx, idx + query.length)}</mark>`;
+			pos = idx + query.length;
+		}
+		if (pos === 0) return '';
+		result += content.slice(pos);
+		return result;
+	});
 
 	let bgClass = $derived(
 		line.origin === 'Addition'
@@ -26,7 +46,9 @@
 	<td class="line-num new">{line.new_lineno ?? ''}</td>
 	<td class="origin">{originChar}</td>
 	<td class="content">
-		{#if highlighted}
+		{#if searchHighlighted}
+			{@html searchHighlighted}
+		{:else if highlighted}
 			{@html highlighted}
 		{:else}
 			{line.content}

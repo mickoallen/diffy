@@ -40,6 +40,7 @@ pub struct FileDiff {
     pub status: FileStatus,
     pub additions: usize,
     pub deletions: usize,
+    pub is_binary: bool,
     pub hunks: Vec<Hunk>,
 }
 
@@ -50,6 +51,7 @@ pub struct FileSummary {
     pub status: FileStatus,
     pub additions: usize,
     pub deletions: usize,
+    pub is_binary: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
