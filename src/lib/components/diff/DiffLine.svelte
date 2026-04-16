@@ -12,19 +12,21 @@
 	let searchHighlighted = $derived.by(() => {
 		const query = diffStore.searchQuery;
 		if (!query) return '';
-		const content = highlighted || line.content;
+		const content = line.content;
 		const lower = content.toLowerCase();
 		const qLower = query.toLowerCase();
+		const escape = (s: string) =>
+			s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 		let idx = 0;
 		let result = '';
 		let pos = 0;
 		while ((idx = lower.indexOf(qLower, pos)) !== -1) {
-			result += content.slice(pos, idx);
-			result += `<mark class="search-highlight">${content.slice(idx, idx + query.length)}</mark>`;
+			result += escape(content.slice(pos, idx));
+			result += `<mark class="search-highlight">${escape(content.slice(idx, idx + query.length))}</mark>`;
 			pos = idx + query.length;
 		}
 		if (pos === 0) return '';
-		result += content.slice(pos);
+		result += escape(content.slice(pos));
 		return result;
 	});
 

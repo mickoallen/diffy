@@ -10,6 +10,7 @@
 	import SearchBar from './SearchBar.svelte';
 	import { marked } from 'marked';
 	import { convertFileSrc } from '@tauri-apps/api/core';
+	import { highlightLines } from '$lib/utils/highlighter';
 
 	function handleExplainHunk(content: string) {
 		settingsStore.showAiPanel = true;
@@ -29,11 +30,24 @@
 
 	let isMdFile = $derived(currentFilePath?.endsWith('.md') ?? false);
 
+	let allFilesHighlighted = $state<string[]>([]);
+
 	$effect(() => {
 		// Reset when file changes
 		currentFilePath;
 		showMarkdown = false;
 		mdContent = null;
+	});
+
+	$effect(() => {
+		const currentLines = lines;
+		const path = currentFilePath;
+		const theme = settingsStore.isDark ? 'dark' : 'light';
+		allFilesHighlighted = [];
+		if (!path || currentLines.length === 0) return;
+		highlightLines(currentLines, path, theme).then((result) => {
+			allFilesHighlighted = result;
+		});
 	});
 
 	async function enableMarkdown() {
@@ -92,7 +106,9 @@
 					{#each lines as line, i}
 						<div class="line">
 							<span class="lineno">{i + 1}</span>
-							<span class="content">{line}</span>
+							<span class="content"
+								>{#if allFilesHighlighted[i]}{@html allFilesHighlighted[i]}{:else}{line}{/if}</span
+							>
 						</div>
 					{/each}
 				</div>
