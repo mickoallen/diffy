@@ -1,5 +1,6 @@
 <script lang="ts">
 	import type { FileDiff } from '$lib/services/git';
+	import CopyButton from '$lib/components/layout/CopyButton.svelte';
 
 	interface Props {
 		file: FileDiff;
@@ -29,6 +30,7 @@
 			{file.path}
 		{/if}
 	</span>
+	<CopyButton text={file.path} label="Copy file path" toastMessage="Path copied" />
 	<span class="stats">
 		{#if file.additions > 0}
 			<span class="additions">+{file.additions}</span>

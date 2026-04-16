@@ -183,3 +183,12 @@ body {
 	background: rgba(255, 213, 79, 0.8);
 	outline: 2px solid #ffd54f;
 }
+
+/* Jump-to-line flash */
+@keyframes line-flash {
+	0%   { background: rgba(255, 213, 79, 0.6); }
+	100% { background: transparent; }
+}
+.line-flash {
+	animation: line-flash 1.2s ease-out;
+}

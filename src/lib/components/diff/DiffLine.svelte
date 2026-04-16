@@ -41,7 +41,11 @@
 	);
 </script>
 
-<tr class="diff-line {bgClass}">
+<tr
+	class="diff-line {bgClass}"
+	data-old-lineno={line.old_lineno ?? ''}
+	data-new-lineno={line.new_lineno ?? ''}
+>
 	<td class="line-num old">{line.old_lineno ?? ''}</td>
 	<td class="line-num new">{line.new_lineno ?? ''}</td>
 	<td class="origin">{originChar}</td>

@@ -24,7 +24,8 @@
 
 	{#if !settingsStore.aiApiKey && settingsStore.aiProvider !== 'ollama' && settingsStore.aiProvider !== 'lmstudio'}
 		<div class="no-key">
-			<p>Configure your AI provider and API key in Settings to use AI features.</p>
+			<p>Configure your AI provider and API key to use AI features.</p>
+			<button class="settings-link" onclick={() => settingsStore.toggleSettings()}>Open Settings</button>
 		</div>
 	{:else}
 		<div class="actions">
@@ -101,6 +102,21 @@
 		padding: 16px;
 		color: var(--text-muted);
 		font-size: 0.929rem;
+	}
+	.no-key p {
+		margin: 0 0 10px;
+	}
+	.settings-link {
+		padding: 6px 12px;
+		border-radius: 6px;
+		border: 1px solid var(--border);
+		background: var(--bg-tertiary);
+		color: var(--text-primary);
+		font-size: 0.857rem;
+		cursor: pointer;
+	}
+	.settings-link:hover {
+		background: var(--bg-hover);
 	}
 	.actions {
 		display: flex;

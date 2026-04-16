@@ -4,6 +4,7 @@ mod git;
 mod watcher;
 
 use commands::{ai as ai_cmds, diff as diff_cmds, git as git_cmds, watcher as watcher_cmds};
+use commands::git::AssetScopeState;
 use tauri::Manager;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -13,6 +14,7 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_store::Builder::default().build())
         .manage(watcher::WatcherState::new())
+        .manage(AssetScopeState::default())
         .setup(|app| {
             // Force the main window to grab focus on launch (macOS workaround).
             if let Some(w) = app.get_webview_window("main") {
@@ -34,6 +36,10 @@ pub fn run() {
             diff_cmds::get_file_diff,
             diff_cmds::get_workdir_summary,
             diff_cmds::get_workdir_file_diff,
+            diff_cmds::get_staged_summary,
+            diff_cmds::get_staged_file_diff,
+            diff_cmds::get_unstaged_summary,
+            diff_cmds::get_unstaged_file_diff,
             diff_cmds::get_branch_to_workdir_summary,
             diff_cmds::get_branch_to_workdir_file_diff,
             diff_cmds::get_local_vs_remote,

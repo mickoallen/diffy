@@ -3,10 +3,13 @@
 	import { open } from '@tauri-apps/plugin-dialog';
 	import { invoke } from '@tauri-apps/api/core';
 	import { listen, type UnlistenFn } from '@tauri-apps/api/event';
+	import { getCurrentWebview } from '@tauri-apps/api/webview';
 	import { repoStore } from '$lib/stores/repo.svelte';
 	import { diffStore } from '$lib/stores/diff.svelte';
 	import { settingsStore } from '$lib/stores/settings.svelte';
 	import { recentsStore } from '$lib/stores/recents.svelte';
+	import { reviewedStore } from '$lib/stores/reviewed.svelte';
+	import { repoPrefsStore } from '$lib/stores/repoPrefs.svelte';
 	import { setupKeyboardShortcuts } from '$lib/utils/keyboard';
 	import type { BranchInfo } from '$lib/services/git';
 	import { getDefaultBranch, getRemoteUrl } from '$lib/services/git';
@@ -18,12 +21,15 @@
 	import SettingsModal from '$lib/components/layout/SettingsModal.svelte';
 	import DebugModal from '$lib/components/layout/DebugModal.svelte';
 	import ShortcutSheet from '$lib/components/layout/ShortcutSheet.svelte';
+	import FilePalette from '$lib/components/layout/FilePalette.svelte';
 	import { debugStore } from '$lib/stores/debug.svelte';
 
 	let repoPath = $state('');
 	let remoteUrl = $state('');
 	let repoOpened = $state(false);
+	let dragActive = $state(false);
 	let unlistenRefresh: UnlistenFn | undefined;
+	let unlistenDragDrop: UnlistenFn | undefined;
 
 	let cleanupKeyboard: (() => void) | undefined;
 
@@ -38,7 +44,8 @@
 		cleanupKeyboard = setupKeyboardShortcuts();
 
 		// Load settings in parallel — don't block the rest of init.
-		settingsStore.load().then(() => console.log('onMount: settings loaded')).catch(() => {});
+		// Errors are surfaced via the toast store from inside load().
+		settingsStore.load().then(() => console.log('onMount: settings loaded'));
 
 		let gitStateTimer: ReturnType<typeof setTimeout> | undefined;
 		listen<{ kind: string }>('git://refresh', async (event) => {
@@ -63,11 +70,26 @@
 				await diffStore.refreshLocalChanges();
 			}
 		}).then((fn) => { unlistenRefresh = fn; });
+
+		// Drag-and-drop a folder onto the welcome screen to open it.
+		getCurrentWebview().onDragDropEvent((event) => {
+			if (repoOpened) return;
+			if (event.payload.type === 'enter' || event.payload.type === 'over') {
+				dragActive = true;
+			} else if (event.payload.type === 'leave') {
+				dragActive = false;
+			} else if (event.payload.type === 'drop') {
+				dragActive = false;
+				const first = event.payload.paths[0];
+				if (first) handleOpenRepo(first);
+			}
+		}).then((fn) => { unlistenDragDrop = fn; });
 	});
 
 	onDestroy(() => {
 		cleanupKeyboard?.();
 		unlistenRefresh?.();
+		unlistenDragDrop?.();
 		if (repoOpened) {
 			invoke('stop_watching').catch(() => {});
 		}
@@ -81,9 +103,8 @@
 	}
 
 	async function reloadCurrentDiff() {
-		if (repoOpened && diffStore.fromRef && diffStore.toRef) {
-			await diffStore.loadBranchDiff(diffStore.fromRef, diffStore.toRef);
-		}
+		if (!repoOpened) return;
+		await diffStore.reload();
 	}
 
 	async function handleOpenRepo(path?: string) {
@@ -97,17 +118,38 @@
 			console.log(`handleOpenRepo: repoStore.open done, error="${repoStore.error}"`);
 			if (!repoStore.error) {
 				recentsStore.add(target);
+				reviewedStore.loadForRepo(target);
+				const prefs = repoPrefsStore.load(target);
 				remoteUrl = await getRemoteUrl(target).catch(() => '');
 				repoOpened = true;
 				invoke('start_watching', { path: target }).catch(() => {});
+
+				// Apply non-data prefs before kicking off the first diff load.
+				if (prefs.viewMode) diffStore.viewMode = prefs.viewMode;
+				if (typeof prefs.ignoreWhitespace === 'boolean') {
+					diffStore.ignoreWhitespace = prefs.ignoreWhitespace;
+				}
+				if (prefs.treeMode) diffStore.treeMode = prefs.treeMode;
+				if (typeof prefs.sidebarHidden === 'boolean') diffStore.sidebarHidden = prefs.sidebarHidden;
+				if (typeof prefs.foldContext === 'boolean') diffStore.foldContext = prefs.foldContext;
+
 				const fromRef = repoStore.currentBranch;
 				console.log(`handleOpenRepo: loading diff fromRef="${fromRef}"`);
-				let toRef = await getDefaultBranch(repoPath).catch(() => '');
+				let toRef = prefs.toRef ?? (await getDefaultBranch(repoPath).catch(() => ''));
 				if (!toRef || toRef === fromRef) {
 					toRef = fallbackDefaultTarget(repoStore.branches, fromRef);
 				}
 				console.log(`handleOpenRepo: toRef="${toRef}", calling loadBranchDiff`);
-				await diffStore.loadBranchDiff(fromRef, toRef);
+				diffStore.fromRef = fromRef;
+				diffStore.toRef = toRef;
+				diffStore.diffMode = prefs.diffMode ?? 'branch';
+				await diffStore.loadDiff();
+
+				// Restore last-selected file if it's still in the diff.
+				if (prefs.lastSelectedFile && diffStore.summary) {
+					const match = diffStore.summary.files.find((f) => f.path === prefs.lastSelectedFile);
+					if (match) await diffStore.selectFile(match);
+				}
 				console.log('handleOpenRepo: done');
 			}
 		} catch (e) {
@@ -124,19 +166,21 @@
 		remoteUrl = '';
 		repoStore.reset();
 		diffStore.reset();
+		reviewedStore.loadForRepo('');
+		repoPrefsStore.clear();
 		invoke('stop_watching').catch(() => {});
 	}
 
 	async function handleTargetChange(v: string) {
-		diffStore.toRef = v;
-		await reloadCurrentDiff();
+		await diffStore.setToRef(v);
 	}
 </script>
 
 <svelte:window onkeydown={onKeydown} />
 
 {#if !repoOpened}
-	<div class="welcome">
+	<div class="welcome" class:drag-active={dragActive}>
+		<div class="drop-hint">Drop folder to open</div>
 		<div class="welcome-card">
 			<div class="welcome-logo-wrap">
 				<img src="/full-logo.png" alt="" class="welcome-logo-blur" aria-hidden="true" />
@@ -211,17 +255,65 @@
 				<span class="repo-name">{repoPath.split('/').at(-1)}</span>
 			{/if}
 			<div class="branch-controls">
-				<span class="current-branch">{repoStore.currentBranch}</span>
-				<svg class="arrow-icon" width="14" height="14" viewBox="0 0 14 14" fill="none">
-					<path d="M2 7h10M8 3l4 4-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-				</svg>
-				<BranchSelector
-					label=""
-					value={diffStore.toRef}
-					onchange={handleTargetChange}
-				/>
+				<div class="mode-toggle" role="group" aria-label="Diff mode">
+					<button
+						class="mode-btn"
+						class:active={diffStore.diffMode === 'branch'}
+						onclick={() => diffStore.setDiffMode('branch')}
+						title="Compare current branch to target (including uncommitted)"
+					>vs Branch</button>
+					<button
+						class="mode-btn"
+						class:active={diffStore.diffMode === 'staged'}
+						onclick={() => diffStore.setDiffMode('staged')}
+						title="Staged changes (git diff --cached)"
+					>Staged</button>
+					<button
+						class="mode-btn"
+						class:active={diffStore.diffMode === 'unstaged'}
+						onclick={() => diffStore.setDiffMode('unstaged')}
+						title="Unstaged changes (worktree vs index)"
+					>Unstaged</button>
+				</div>
+				{#if diffStore.diffMode === 'branch'}
+					<span class="current-branch">{repoStore.currentBranch}</span>
+					<svg class="arrow-icon" width="14" height="14" viewBox="0 0 14 14" fill="none">
+						<path d="M2 7h10M8 3l4 4-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+					</svg>
+					<BranchSelector
+						label=""
+						value={diffStore.toRef}
+						onchange={handleTargetChange}
+					/>
+				{/if}
 			</div>
 			<div class="top-actions">
+				<button
+					class="icon-btn"
+					onclick={() => diffStore.toggleSidebar()}
+					title="Toggle sidebar (⌘\)"
+					aria-pressed={!diffStore.sidebarHidden}
+				>
+					<svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.3">
+						<rect x="1.5" y="2" width="11" height="10" rx="1.5"/>
+						<line x1="5" y1="2" x2="5" y2="12"/>
+					</svg>
+				</button>
+				<button
+					class="icon-btn ws-btn"
+					class:active={diffStore.foldContext}
+					onclick={() => diffStore.toggleFoldContext()}
+					title="Fold context lines (c)"
+					aria-pressed={diffStore.foldContext}
+				>±</button>
+				<button
+					class="icon-btn ws-btn"
+					class:active={diffStore.ignoreWhitespace}
+					onclick={() => diffStore.toggleIgnoreWhitespace()}
+					title="Ignore whitespace (w)"
+					disabled={diffStore.loading}
+					aria-pressed={diffStore.ignoreWhitespace}
+				>W</button>
 				<button
 					class="icon-btn"
 					class:pending={diffStore.pendingWorkdirChange}
@@ -257,7 +349,9 @@
 		</header>
 
 		<div class="content">
-			<Sidebar />
+			{#if !diffStore.sidebarHidden}
+				<Sidebar />
+			{/if}
 			<MainPanel />
 			{#if settingsStore.showAiPanel}
 				<AiPanel />
@@ -281,6 +375,12 @@
 				{#if diffStore.summary.total_deletions > 0}
 					<span class="stat-del">−{diffStore.summary.total_deletions}</span>
 				{/if}
+				{@const reviewedInView = diffStore.summary.files.filter(f => reviewedStore.has(f.path)).length}
+				{#if diffStore.summary.files.length > 0}
+					<span class="stat-reviewed" title="Files marked reviewed in this view">
+						{reviewedInView} / {diffStore.summary.files.length} reviewed
+					</span>
+				{/if}
 			{/if}
 			<span class="spacer"></span>
 		</footer>
@@ -296,6 +396,7 @@
 {/if}
 
 <ShortcutSheet />
+<FilePalette />
 
 <style>
 	.welcome {
@@ -329,6 +430,29 @@
 		inset: 0;
 		background: radial-gradient(ellipse 85% 75% at 50% 50%, transparent, var(--bg-primary));
 		pointer-events: none;
+	}
+	.welcome.drag-active {
+		outline: 3px dashed var(--color-accent);
+		outline-offset: -12px;
+	}
+	.drop-hint {
+		position: absolute;
+		top: 16px;
+		left: 50%;
+		transform: translateX(-50%);
+		padding: 6px 14px;
+		border-radius: 999px;
+		background: var(--color-accent);
+		color: white;
+		font-size: 0.857rem;
+		font-weight: 600;
+		opacity: 0;
+		transition: opacity 0.15s;
+		pointer-events: none;
+		z-index: 2;
+	}
+	.welcome.drag-active .drop-hint {
+		opacity: 1;
 	}
 	.splash-settings-btn {
 		position: absolute;
@@ -618,6 +742,45 @@
 		flex: 1;
 		justify-content: center;
 	}
+	.mode-toggle {
+		display: inline-flex;
+		border: 1px solid var(--border);
+		border-radius: 6px;
+		overflow: hidden;
+		background: var(--bg-tertiary);
+	}
+	.mode-btn {
+		padding: 4px 10px;
+		background: transparent;
+		border: none;
+		color: var(--text-muted);
+		font-size: 0.786rem;
+		font-weight: 500;
+		cursor: pointer;
+		font-family: inherit;
+	}
+	.mode-btn + .mode-btn {
+		border-left: 1px solid var(--border);
+	}
+	.mode-btn:hover:not(.active) {
+		color: var(--text-primary);
+		background: var(--bg-hover);
+	}
+	.mode-btn.active {
+		color: var(--color-accent);
+		background: var(--bg-primary);
+	}
+	.ws-btn {
+		font-family: 'SF Mono', 'Fira Code', monospace;
+		font-weight: 700;
+		width: 28px;
+		justify-content: center;
+	}
+	.ws-btn.active {
+		color: var(--color-accent);
+		background: var(--bg-tertiary);
+		border-color: var(--color-accent);
+	}
 	.current-branch {
 		font-size: 0.929rem;
 		font-weight: 600;
@@ -716,6 +879,11 @@
 	}
 	.stat-files {
 		color: var(--text-secondary);
+	}
+	.stat-reviewed {
+		margin-left: auto;
+		color: var(--text-muted);
+		font-variant-numeric: tabular-nums;
 	}
 	.stat-add {
 		color: var(--color-add);

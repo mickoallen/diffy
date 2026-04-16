@@ -1,4 +1,5 @@
 import { load as loadStore } from '@tauri-apps/plugin-store';
+import { toastStore } from './toast.svelte';
 
 export type Theme = 'void' | 'abyss' | 'chalk' | 'nate';
 export type Font = 'system' | 'jetbrains' | 'fira' | 'ibm';
@@ -11,6 +12,11 @@ const SCALE_VALUES: Record<Scale, string> = {
 	relaxed: '15px',
 	large: '16px'
 };
+
+function detectSystemTheme(): Theme {
+	if (typeof window === 'undefined' || !window.matchMedia) return 'void';
+	return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'void' : 'chalk';
+}
 
 class SettingsStore {
 	theme = $state<Theme>('void');
@@ -60,9 +66,20 @@ class SettingsStore {
 	}
 
 	async load() {
+		let store;
 		try {
-			const store = await loadStore('settings.json', { autoSave: false, defaults: {} });
-			const theme = (await store.get<Theme>('theme')) ?? 'void';
+			store = await loadStore('settings.json', { autoSave: false, defaults: {} });
+		} catch (e) {
+			// Plugin-store unavailable — apply defaults silently (first run or sandbox).
+			this.applyDefaultsWithSystemTheme();
+			console.error('Settings store unavailable:', e);
+			return;
+		}
+
+		try {
+			const hasExisting = await store.has('theme');
+			const defaultTheme: Theme = hasExisting ? 'void' : detectSystemTheme();
+			const theme = (await store.get<Theme>('theme')) ?? defaultTheme;
 			const font = (await store.get<Font>('font')) ?? 'system';
 			const scale = (await store.get<Scale>('scale')) ?? 'default';
 			const aiApiKey = (await store.get<string>('aiApiKey')) ?? '';
@@ -81,12 +98,17 @@ class SettingsStore {
 			this.applyTheme(theme);
 			this.applyFont(font);
 			this.applyScale(scale);
-		} catch {
-			// First run or store unavailable — apply defaults
-			this.applyTheme(this.theme);
-			this.applyFont(this.font);
-			this.applyScale(this.scale);
+		} catch (e) {
+			this.applyDefaultsWithSystemTheme();
+			toastStore.push(`Settings load failed: ${String(e)}`, 'error');
 		}
+	}
+
+	private applyDefaultsWithSystemTheme() {
+		this.theme = detectSystemTheme();
+		this.applyTheme(this.theme);
+		this.applyFont(this.font);
+		this.applyScale(this.scale);
 	}
 
 	async save() {
@@ -100,8 +122,8 @@ class SettingsStore {
 			await store.set('aiModel', this.aiModel);
 			await store.set('aiBaseUrl', this.aiBaseUrl);
 			await store.save();
-		} catch {
-			// Ignore save errors
+		} catch (e) {
+			toastStore.push(`Settings save failed: ${String(e)}`, 'error');
 		}
 	}
 

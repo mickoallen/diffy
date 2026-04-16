@@ -9,7 +9,10 @@ class Animal:
     def speak(self) -> str:
         return f"{self.name} says {self.sound}"
 
+    def __repr__(self) -> str:
+        return f"Animal({self.name!r}, {self.sound!r})"
+
 def greet(name: str) -> str:
     return f"Hello, {name}!"
 
-animals = [Animal("Cat", "meow"), Animal("Dog", "woof")]
+animals = [Animal("Cat", "meow"), Animal("Dog", "woof"), Animal("Bird", "chirp")]

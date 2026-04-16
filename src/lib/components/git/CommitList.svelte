@@ -1,5 +1,6 @@
 <script lang="ts">
 	import type { CommitInfo } from '$lib/services/git';
+	import CopyButton from '$lib/components/layout/CopyButton.svelte';
 
 	interface Props {
 		commits: CommitInfo[];
@@ -18,9 +19,13 @@
 </script>
 
 <div class="commit-list">
+	{#if commits.length === 0}
+		<div class="empty">No commits between these refs.</div>
+	{/if}
 	{#each commits as commit}
 		<div class="commit">
 			<span class="sha">{commit.id.slice(0, 7)}</span>
+			<CopyButton text={commit.id} label="Copy full SHA" toastMessage="SHA copied" />
 			<span class="summary">{commit.summary}</span>
 			<span class="meta">{commit.author} · {formatTime(commit.time)}</span>
 		</div>
@@ -48,6 +53,13 @@
 	.sha {
 		font-family: 'SF Mono', 'Fira Code', monospace;
 		color: var(--color-accent);
+	}
+	.empty {
+		padding: 16px 12px;
+		text-align: center;
+		color: var(--text-muted);
+		font-size: 0.857rem;
+		font-style: italic;
 	}
 	.summary {
 		flex: 1;

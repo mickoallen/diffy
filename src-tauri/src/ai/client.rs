@@ -145,7 +145,10 @@ async fn call_claude(api_key: &str, model: &str, system: &str, user_content: &st
 
     if !resp.status().is_success() {
         let status = resp.status();
-        let text = resp.text().await.unwrap_or_default();
+        let text = match resp.text().await {
+            Ok(t) => t,
+            Err(e) => format!("<failed to read error body: {}>", e),
+        };
         return Err(format!("API error {}: {}", status, text));
     }
 
@@ -180,7 +183,10 @@ async fn call_openai_compat(base_url: &str, api_key: &str, model: &str, system: 
 
     if !resp.status().is_success() {
         let status = resp.status();
-        let text = resp.text().await.unwrap_or_default();
+        let text = match resp.text().await {
+            Ok(t) => t,
+            Err(e) => format!("<failed to read error body: {}>", e),
+        };
         return Err(format!("API error {}: {}", status, text));
     }
 
@@ -218,7 +224,10 @@ async fn call_gemini(api_key: &str, model: &str, system: &str, user_content: &st
 
     if !resp.status().is_success() {
         let status = resp.status();
-        let text = resp.text().await.unwrap_or_default();
+        let text = match resp.text().await {
+            Ok(t) => t,
+            Err(e) => format!("<failed to read error body: {}>", e),
+        };
         return Err(format!("API error {}: {}", status, text));
     }
 

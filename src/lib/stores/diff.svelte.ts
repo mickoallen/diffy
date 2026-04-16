@@ -1,6 +1,10 @@
 import {
 	getBranchToWorkdirSummary,
 	getBranchToWorkdirFileDiff,
+	getStagedSummary,
+	getStagedFileDiff,
+	getUnstagedSummary,
+	getUnstagedFileDiff,
 	getWorkdirSummary,
 	listRepoFiles,
 	readRepoFile,
@@ -9,13 +13,20 @@ import {
 	type FileSummary
 } from '$lib/services/git';
 import { repoStore } from './repo.svelte';
+import { repoPrefsStore } from './repoPrefs.svelte';
 
 export type ViewMode = 'unified' | 'split' | 'full';
 export type TreeMode = 'diffs' | 'all';
+export type DiffMode = 'branch' | 'staged' | 'unstaged';
 
 class DiffStore {
 	viewMode = $state<ViewMode>('unified');
 	treeMode = $state<TreeMode>('diffs');
+	diffMode = $state<DiffMode>('branch');
+	ignoreWhitespace = $state(false);
+	sidebarHidden = $state(false);
+	foldContext = $state(false);
+	collapsedHunks = $state<Set<string>>(new Set());
 
 	fromRef = $state('');
 	toRef = $state('');
@@ -61,6 +72,32 @@ class DiffStore {
 		this.error = '';
 		this.retryAction = null;
 		this.treeMode = 'diffs';
+		this.diffMode = 'branch';
+		this.ignoreWhitespace = false;
+		this.sidebarHidden = false;
+		this.foldContext = false;
+		this.collapsedHunks = new Set();
+	}
+
+	toggleSidebar() {
+		this.sidebarHidden = !this.sidebarHidden;
+		repoPrefsStore.update({ sidebarHidden: this.sidebarHidden });
+	}
+
+	toggleFoldContext() {
+		this.foldContext = !this.foldContext;
+		repoPrefsStore.update({ foldContext: this.foldContext });
+	}
+
+	toggleHunkCollapsed(key: string) {
+		const next = new Set(this.collapsedHunks);
+		if (next.has(key)) next.delete(key);
+		else next.add(key);
+		this.collapsedHunks = next;
+	}
+
+	isHunkCollapsed(key: string): boolean {
+		return this.collapsedHunks.has(key);
 	}
 
 	async refreshLocalChanges() {
@@ -72,21 +109,72 @@ class DiffStore {
 		}
 	}
 
+	private async fetchSummary(): Promise<DiffSummary> {
+		const ws = this.ignoreWhitespace;
+		switch (this.diffMode) {
+			case 'staged':
+				return getStagedSummary(repoStore.path, ws);
+			case 'unstaged':
+				return getUnstagedSummary(repoStore.path, ws);
+			case 'branch':
+			default:
+				return getBranchToWorkdirSummary(repoStore.path, this.toRef, ws);
+		}
+	}
+
+	private async fetchFileDiff(filePath: string): Promise<FileDiff> {
+		const ws = this.ignoreWhitespace;
+		switch (this.diffMode) {
+			case 'staged':
+				return getStagedFileDiff(repoStore.path, filePath, ws);
+			case 'unstaged':
+				return getUnstagedFileDiff(repoStore.path, filePath, ws);
+			case 'branch':
+			default:
+				return getBranchToWorkdirFileDiff(repoStore.path, this.toRef, filePath, ws);
+		}
+	}
+
 	// toRef is the base/target branch (e.g. "main"); diffs against working directory
 	async reload() {
-		if (this.fromRef && this.toRef) {
-			await this.loadBranchDiff(this.fromRef, this.toRef);
+		if (this.diffMode !== 'branch' || (this.fromRef && this.toRef)) {
+			await this.loadDiff();
 		}
 	}
 
 	async loadBranchDiff(fromRef: string, toRef: string) {
-		this.loading = true;
-		this.error = '';
+		this.diffMode = 'branch';
 		this.fromRef = fromRef;
 		this.toRef = toRef;
+		repoPrefsStore.update({ diffMode: 'branch', toRef });
+		await this.loadDiff();
+	}
+
+	async setToRef(toRef: string) {
+		this.toRef = toRef;
+		repoPrefsStore.update({ toRef });
+		await this.reload();
+	}
+
+	async setDiffMode(mode: DiffMode) {
+		if (this.diffMode === mode) return;
+		this.diffMode = mode;
+		repoPrefsStore.update({ diffMode: mode });
+		await this.loadDiff();
+	}
+
+	async toggleIgnoreWhitespace() {
+		this.ignoreWhitespace = !this.ignoreWhitespace;
+		repoPrefsStore.update({ ignoreWhitespace: this.ignoreWhitespace });
+		await this.loadDiff();
+	}
+
+	async loadDiff() {
+		this.loading = true;
+		this.error = '';
 		try {
 			this.pendingWorkdirChange = false;
-			this.summary = await getBranchToWorkdirSummary(repoStore.path, toRef);
+			this.summary = await this.fetchSummary();
 			this.selectedFile = null;
 			this.fileDiff = null;
 			if (this.summary.files.length > 0) {
@@ -94,7 +182,7 @@ class DiffStore {
 			}
 		} catch (e) {
 			this.error = String(e);
-			this.retryAction = () => this.loadBranchDiff(fromRef, toRef);
+			this.retryAction = () => this.loadDiff();
 		} finally {
 			this.loading = false;
 		}
@@ -103,8 +191,9 @@ class DiffStore {
 	async selectFile(file: FileSummary) {
 		this.selectedFile = file;
 		this.fileLoading = true;
+		repoPrefsStore.update({ lastSelectedFile: file.path });
 		try {
-			this.fileDiff = await getBranchToWorkdirFileDiff(repoStore.path, this.toRef, file.path);
+			this.fileDiff = await this.fetchFileDiff(file.path);
 		} catch (e) {
 			this.error = String(e);
 			this.retryAction = () => this.selectFile(file);
@@ -153,6 +242,7 @@ class DiffStore {
 
 	async setTreeMode(mode: TreeMode) {
 		this.treeMode = mode;
+		repoPrefsStore.update({ treeMode: mode });
 		if (mode === 'all' && this.allFiles.length === 0) {
 			await this.loadAllFiles();
 		}
@@ -200,6 +290,7 @@ class DiffStore {
 		if (this.viewMode === 'unified') this.viewMode = 'split';
 		else if (this.viewMode === 'split') this.viewMode = 'full';
 		else this.viewMode = 'unified';
+		repoPrefsStore.update({ viewMode: this.viewMode });
 	}
 }
 

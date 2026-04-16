@@ -1,6 +1,8 @@
 <script lang="ts">
 	import { diffStore } from '$lib/stores/diff.svelte';
 	import { settingsStore } from '$lib/stores/settings.svelte';
+	import { reviewedStore } from '$lib/stores/reviewed.svelte';
+	import { repoPrefsStore } from '$lib/stores/repoPrefs.svelte';
 	import type { FileSummary } from '$lib/services/git';
 
 	const statusIcon: Record<string, string> = {
@@ -24,13 +26,20 @@
 		file?: FileSummary | { path: string };
 	}
 
-	// Collapsed folder paths — persists across tree rebuilds
+	// Collapsed folder paths — persists across tree rebuilds, and across sessions per repo.
 	let collapsedPaths = $state(new Set<string>());
 
 	// Resizable sidebar width
 	let sidebarWidth = $state(260);
 	const MIN_WIDTH = 160;
 	const MAX_WIDTH = 600;
+
+	// Restore per-repo prefs whenever the current repo changes.
+	$effect(() => {
+		const prefs = repoPrefsStore.current;
+		if (typeof prefs.sidebarWidth === 'number') sidebarWidth = prefs.sidebarWidth;
+		if (prefs.collapsedPaths) collapsedPaths = new Set(prefs.collapsedPaths);
+	});
 
 	function startResize(e: MouseEvent) {
 		e.preventDefault();
@@ -43,9 +52,26 @@
 		function onUp() {
 			window.removeEventListener('mousemove', onMove);
 			window.removeEventListener('mouseup', onUp);
+			repoPrefsStore.update({ sidebarWidth });
 		}
 		window.addEventListener('mousemove', onMove);
 		window.addEventListener('mouseup', onUp);
+	}
+
+	// Keyboard resize for the separator: arrow keys nudge width, Home/End snap to bounds.
+	function onResizeKeydown(e: KeyboardEvent) {
+		const STEP = e.shiftKey ? 40 : 10;
+		let next = sidebarWidth;
+		switch (e.key) {
+			case 'ArrowLeft':  next -= STEP; break;
+			case 'ArrowRight': next += STEP; break;
+			case 'Home':       next = MIN_WIDTH; break;
+			case 'End':        next = MAX_WIDTH; break;
+			default: return;
+		}
+		e.preventDefault();
+		sidebarWidth = Math.min(MAX_WIDTH, Math.max(MIN_WIDTH, next));
+		repoPrefsStore.update({ sidebarWidth });
 	}
 
 	function buildTree(paths: string[], diffFiles: Map<string, FileSummary>): TreeNode[] {
@@ -117,6 +143,7 @@
 			collapsedPaths.add(node.path);
 		}
 		collapsedPaths = new Set(collapsedPaths); // trigger reactivity
+		repoPrefsStore.update({ collapsedPaths: [...collapsedPaths] });
 	}
 
 	function selectNode(node: TreeNode) {
@@ -178,29 +205,50 @@
 				{#if node.file}
 					<!-- File node -->
 					{@const diffFile = diffFileMap.get(node.path)}
-					<button
-						class="file-item"
+					<div
+						class="file-row"
 						class:selected={isSelected(node)}
+						class:reviewed={diffFile && reviewedStore.has(node.path)}
 						style="padding-left: {8 + depth * 14}px"
-						onclick={() => selectNode(node)}
 					>
-						{#if diffFile}
-							<span class="status {statusClass[diffFile.status]}">{statusIcon[diffFile.status]}</span>
-						{:else}
-							<span class="status-placeholder"></span>
-						{/if}
-						<span class="name">{node.name}</span>
-						{#if diffFile}
-							{#if diffFile.is_binary}
-								<span class="binary-badge">BIN</span>
+						<button
+							type="button"
+							class="file-item"
+							onclick={() => selectNode(node)}
+						>
+							{#if diffFile}
+								<span class="status {statusClass[diffFile.status]}">{statusIcon[diffFile.status]}</span>
 							{:else}
-								<span class="stats">
-									{#if diffFile.additions > 0}<span class="add">+{diffFile.additions}</span>{/if}
-									{#if diffFile.deletions > 0}<span class="del">-{diffFile.deletions}</span>{/if}
-								</span>
+								<span class="status-placeholder"></span>
 							{/if}
+							<span class="name">{node.name}</span>
+							{#if diffFile}
+								{#if diffFile.is_binary}
+									<span class="binary-badge">BIN</span>
+								{:else}
+									<span class="stats">
+										{#if diffFile.additions > 0}<span class="add">+{diffFile.additions}</span>{/if}
+										{#if diffFile.deletions > 0}<span class="del">-{diffFile.deletions}</span>{/if}
+									</span>
+								{/if}
+							{/if}
+						</button>
+						{#if diffFile}
+							<button
+								type="button"
+								class="review-check"
+								class:checked={reviewedStore.has(node.path)}
+								tabindex="-1"
+								aria-label={reviewedStore.has(node.path) ? 'Mark as not reviewed' : 'Mark as reviewed'}
+								title="Mark reviewed (v)"
+								onclick={() => reviewedStore.toggle(node.path)}
+							>
+								<svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true">
+									<path d="M2.5 6.5L5 9l4.5-5.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+								</svg>
+							</button>
 						{/if}
-					</button>
+					</div>
 				{:else}
 					<!-- Folder node -->
 					{@const expanded = !collapsedPaths.has(node.path)}
@@ -222,7 +270,18 @@
 		{/snippet}
 		{@render renderTree(tree, 0)}
 	</div>
-	<div class="resize-handle" onmousedown={startResize} role="separator" aria-orientation="vertical" tabindex="0"></div>
+	<div
+		class="resize-handle"
+		role="slider"
+		aria-orientation="vertical"
+		aria-label="Resize sidebar"
+		aria-valuemin={MIN_WIDTH}
+		aria-valuemax={MAX_WIDTH}
+		aria-valuenow={sidebarWidth}
+		tabindex="0"
+		onmousedown={startResize}
+		onkeydown={onResizeKeydown}
+	></div>
 </aside>
 
 <style>
@@ -346,15 +405,30 @@
 	.dir-name {
 		flex: 1;
 	}
-	.file-item {
+	.file-row {
 		display: flex;
 		align-items: center;
-		gap: 6px;
 		width: max-content;
 		min-width: 100%;
+		padding-right: 8px;
+	}
+	.file-row.selected {
+		background: var(--bg-active);
+	}
+	.file-row:hover {
+		background: var(--bg-hover);
+	}
+	.file-row.selected:hover {
+		background: var(--bg-active);
+	}
+	.file-item {
+		display: flex;
+		flex: 1;
+		align-items: center;
+		gap: 6px;
 		padding-top: 4px;
 		padding-bottom: 4px;
-		padding-right: 12px;
+		padding-right: 8px;
 		border: none;
 		background: transparent;
 		color: var(--text-primary);
@@ -362,11 +436,35 @@
 		cursor: pointer;
 		text-align: left;
 	}
-	.file-item:hover {
-		background: var(--bg-hover);
+	.file-row.reviewed .name {
+		color: var(--text-muted);
+		text-decoration: line-through;
+		text-decoration-thickness: 1px;
 	}
-	.file-item.selected {
-		background: var(--bg-active);
+	.review-check {
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		width: 18px;
+		height: 18px;
+		padding: 0;
+		border: none;
+		border-radius: 3px;
+		background: transparent;
+		color: var(--text-muted);
+		cursor: pointer;
+		opacity: 0.35;
+		flex-shrink: 0;
+	}
+	.review-check.checked {
+		color: var(--color-add);
+		opacity: 1;
+	}
+	.file-row:hover .review-check {
+		opacity: 1;
+	}
+	.review-check:hover {
+		background: var(--bg-tertiary);
 	}
 	.status {
 		font-family: 'SF Mono', 'Fira Code', monospace;

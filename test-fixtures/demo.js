@@ -10,6 +10,9 @@ class Animal {
   speak() {
     console.log(`${this.name} makes a noise.`);
   }
+  toString() {
+    return this.name;
+  }
 }
 
 export default greet;

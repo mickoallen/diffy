@@ -1,5 +1,8 @@
 use git2::{Delta, Diff, DiffOptions, Repository};
 
+/// Max file size (bytes) read from a blob for full-file views. Anything larger is treated as binary.
+pub const MAX_FILE_SIZE_BYTES: usize = 2 * 1024 * 1024;
+
 use super::types::*;
 
 fn delta_to_status(delta: Delta) -> FileStatus {
@@ -15,8 +18,15 @@ pub fn diff_branches(
     repo: &Repository,
     from_ref: &str,
     to_ref: &str,
+    diff_opts: DiffOpts,
 ) -> Result<Vec<FileSummary>, String> {
-    let diff = create_tree_diff(repo, from_ref, to_ref)?;
+    let from_tree = resolve_tree(repo, from_ref)?;
+    let to_tree = resolve_tree(repo, to_ref)?;
+    let mut opts = DiffOptions::new();
+    apply_common_opts(&mut opts, diff_opts);
+    let diff = repo
+        .diff_tree_to_tree(Some(&from_tree), Some(&to_tree), Some(&mut opts))
+        .map_err(|e| format!("Failed to create diff: {}", e))?;
     extract_file_summaries(&diff)
 }
 
@@ -25,12 +35,14 @@ pub fn diff_file_between(
     from_ref: &str,
     to_ref: &str,
     file_path: &str,
+    diff_opts: DiffOpts,
 ) -> Result<FileDiff, String> {
     let from_tree = resolve_tree(repo, from_ref)?;
     let to_tree = resolve_tree(repo, to_ref)?;
 
     let mut opts = DiffOptions::new();
     opts.pathspec(file_path);
+    apply_common_opts(&mut opts, diff_opts);
 
     let diff = repo
         .diff_tree_to_tree(Some(&from_tree), Some(&to_tree), Some(&mut opts))
@@ -39,22 +51,47 @@ pub fn diff_file_between(
     extract_file_diff(&diff, file_path)
 }
 
-pub fn diff_workdir(repo: &Repository) -> Result<Vec<FileSummary>, String> {
-    let head_tree = repo
-        .head()
-        .and_then(|h| h.peel_to_tree())
-        .map_err(|e| format!("Failed to get HEAD tree: {}", e))?;
+/// Options controlling how diffs are produced. Extend fields here rather than
+/// threading more bool parameters through every call site.
+#[derive(Debug, Clone, Copy, Default)]
+pub struct DiffOpts {
+    pub ignore_whitespace: bool,
+}
 
-    // Staged changes (index vs HEAD)
+fn apply_common_opts(opts: &mut DiffOptions, diff_opts: DiffOpts) {
+    if diff_opts.ignore_whitespace {
+        opts.ignore_whitespace(true);
+    }
+}
+
+fn with_untracked(opts: &mut DiffOptions) {
+    opts.include_untracked(true);
+    opts.recurse_untracked_dirs(true);
+    opts.show_untracked_content(true);
+}
+
+fn head_tree(repo: &Repository) -> Result<git2::Tree<'_>, String> {
+    repo.head()
+        .and_then(|h| h.peel_to_tree())
+        .map_err(|e| format!("Failed to get HEAD tree: {}", e))
+}
+
+/// Summaries for everything in workdir relative to `base_tree`:
+/// staged (index vs base) merged with unstaged + untracked (workdir vs index).
+fn summaries_base_to_workdir(
+    repo: &Repository,
+    base_tree: &git2::Tree,
+    diff_opts: DiffOpts,
+) -> Result<Vec<FileSummary>, String> {
+    let mut staged_opts = DiffOptions::new();
+    apply_common_opts(&mut staged_opts, diff_opts);
     let staged = repo
-        .diff_tree_to_index(Some(&head_tree), None, None)
+        .diff_tree_to_index(Some(base_tree), None, Some(&mut staged_opts))
         .map_err(|e| format!("Failed to diff staged: {}", e))?;
 
-    // Unstaged + untracked changes (workdir vs index)
     let mut unstaged_opts = DiffOptions::new();
-    unstaged_opts.include_untracked(true);
-    unstaged_opts.recurse_untracked_dirs(true);
-    unstaged_opts.show_untracked_content(true);
+    with_untracked(&mut unstaged_opts);
+    apply_common_opts(&mut unstaged_opts, diff_opts);
     let unstaged = repo
         .diff_index_to_workdir(None, Some(&mut unstaged_opts))
         .map_err(|e| format!("Failed to diff workdir: {}", e))?;
@@ -62,104 +99,130 @@ pub fn diff_workdir(repo: &Repository) -> Result<Vec<FileSummary>, String> {
     let mut summaries = extract_file_summaries(&staged)?;
     let unstaged_summaries = extract_file_summaries(&unstaged)?;
 
-    // Merge: prefer staged entry if same path exists
+    // Merge: prefer staged entry when the same path appears in both.
     for us in unstaged_summaries {
         if !summaries.iter().any(|s| s.path == us.path) {
             summaries.push(us);
         }
     }
-
     summaries.sort_by(|a, b| a.path.cmp(&b.path));
     Ok(summaries)
 }
 
-pub fn diff_workdir_file(repo: &Repository, file_path: &str) -> Result<FileDiff, String> {
-    let head_tree = repo
-        .head()
-        .and_then(|h| h.peel_to_tree())
-        .map_err(|e| format!("Failed to get HEAD tree: {}", e))?;
-
+/// Single-file diff for a file relative to `base_tree`. Tries staged first, falls back to unstaged.
+fn file_base_to_workdir(
+    repo: &Repository,
+    base_tree: &git2::Tree,
+    file_path: &str,
+    diff_opts: DiffOpts,
+) -> Result<FileDiff, String> {
     let mut opts = DiffOptions::new();
     opts.pathspec(file_path);
+    apply_common_opts(&mut opts, diff_opts);
 
-    // Try staged first
     let staged = repo
-        .diff_tree_to_index(Some(&head_tree), None, Some(&mut opts))
+        .diff_tree_to_index(Some(base_tree), None, Some(&mut opts))
         .map_err(|e| format!("Failed to diff staged: {}", e))?;
 
     if staged.deltas().count() > 0 {
         return extract_file_diff(&staged, file_path);
     }
 
-    // Fall back to unstaged (including untracked)
-    opts.include_untracked(true);
-    opts.recurse_untracked_dirs(true);
-    opts.show_untracked_content(true);
+    with_untracked(&mut opts);
     let unstaged = repo
         .diff_index_to_workdir(None, Some(&mut opts))
         .map_err(|e| format!("Failed to diff workdir: {}", e))?;
 
+    extract_file_diff(&unstaged, file_path)
+}
+
+pub fn diff_workdir(repo: &Repository, diff_opts: DiffOpts) -> Result<Vec<FileSummary>, String> {
+    let tree = head_tree(repo)?;
+    summaries_base_to_workdir(repo, &tree, diff_opts)
+}
+
+pub fn diff_workdir_file(
+    repo: &Repository,
+    file_path: &str,
+    diff_opts: DiffOpts,
+) -> Result<FileDiff, String> {
+    let tree = head_tree(repo)?;
+    file_base_to_workdir(repo, &tree, file_path, diff_opts)
+}
+
+/// Staged changes only (index vs HEAD) — what `git diff --cached` shows.
+pub fn diff_staged(repo: &Repository, diff_opts: DiffOpts) -> Result<Vec<FileSummary>, String> {
+    let tree = head_tree(repo)?;
+    let mut opts = DiffOptions::new();
+    apply_common_opts(&mut opts, diff_opts);
+    let staged = repo
+        .diff_tree_to_index(Some(&tree), None, Some(&mut opts))
+        .map_err(|e| format!("Failed to diff staged: {}", e))?;
+    extract_file_summaries(&staged)
+}
+
+pub fn diff_staged_file(
+    repo: &Repository,
+    file_path: &str,
+    diff_opts: DiffOpts,
+) -> Result<FileDiff, String> {
+    let tree = head_tree(repo)?;
+    let mut opts = DiffOptions::new();
+    opts.pathspec(file_path);
+    apply_common_opts(&mut opts, diff_opts);
+    let staged = repo
+        .diff_tree_to_index(Some(&tree), None, Some(&mut opts))
+        .map_err(|e| format!("Failed to diff staged: {}", e))?;
+    extract_file_diff(&staged, file_path)
+}
+
+/// Unstaged changes only (workdir vs index), including untracked files.
+pub fn diff_unstaged(repo: &Repository, diff_opts: DiffOpts) -> Result<Vec<FileSummary>, String> {
+    let mut opts = DiffOptions::new();
+    with_untracked(&mut opts);
+    apply_common_opts(&mut opts, diff_opts);
+    let unstaged = repo
+        .diff_index_to_workdir(None, Some(&mut opts))
+        .map_err(|e| format!("Failed to diff workdir: {}", e))?;
+    extract_file_summaries(&unstaged)
+}
+
+pub fn diff_unstaged_file(
+    repo: &Repository,
+    file_path: &str,
+    diff_opts: DiffOpts,
+) -> Result<FileDiff, String> {
+    let mut opts = DiffOptions::new();
+    opts.pathspec(file_path);
+    with_untracked(&mut opts);
+    apply_common_opts(&mut opts, diff_opts);
+    let unstaged = repo
+        .diff_index_to_workdir(None, Some(&mut opts))
+        .map_err(|e| format!("Failed to diff workdir: {}", e))?;
     extract_file_diff(&unstaged, file_path)
 }
 
 /// Diff from a base branch tree to the current working directory (staged + unstaged).
 /// Shows all changes (committed on current branch + uncommitted) relative to `base_ref`.
-pub fn diff_branch_to_workdir(repo: &Repository, base_ref: &str) -> Result<Vec<FileSummary>, String> {
+pub fn diff_branch_to_workdir(
+    repo: &Repository,
+    base_ref: &str,
+    diff_opts: DiffOpts,
+) -> Result<Vec<FileSummary>, String> {
     let effective_ref = if base_ref.is_empty() { "HEAD" } else { base_ref };
-    let base_tree = resolve_tree(repo, effective_ref)?;
-
-    // Staged changes (index vs base_ref tree)
-    let staged = repo
-        .diff_tree_to_index(Some(&base_tree), None, None)
-        .map_err(|e| format!("Failed to diff staged: {}", e))?;
-
-    // Unstaged + untracked (workdir vs index)
-    let mut unstaged_opts = DiffOptions::new();
-    unstaged_opts.include_untracked(true);
-    unstaged_opts.recurse_untracked_dirs(true);
-    unstaged_opts.show_untracked_content(true);
-    let unstaged = repo
-        .diff_index_to_workdir(None, Some(&mut unstaged_opts))
-        .map_err(|e| format!("Failed to diff workdir: {}", e))?;
-
-    let mut summaries = extract_file_summaries(&staged)?;
-    let unstaged_summaries = extract_file_summaries(&unstaged)?;
-
-    for us in unstaged_summaries {
-        if !summaries.iter().any(|s| s.path == us.path) {
-            summaries.push(us);
-        }
-    }
-
-    summaries.sort_by(|a, b| a.path.cmp(&b.path));
-    Ok(summaries)
+    let tree = resolve_tree(repo, effective_ref)?;
+    summaries_base_to_workdir(repo, &tree, diff_opts)
 }
 
-pub fn diff_branch_to_workdir_file(repo: &Repository, base_ref: &str, file_path: &str) -> Result<FileDiff, String> {
+pub fn diff_branch_to_workdir_file(
+    repo: &Repository,
+    base_ref: &str,
+    file_path: &str,
+    diff_opts: DiffOpts,
+) -> Result<FileDiff, String> {
     let effective_ref = if base_ref.is_empty() { "HEAD" } else { base_ref };
-    let base_tree = resolve_tree(repo, effective_ref)?;
-
-    let mut opts = DiffOptions::new();
-    opts.pathspec(file_path);
-
-    // Check staged first
-    let staged = repo
-        .diff_tree_to_index(Some(&base_tree), None, Some(&mut opts))
-        .map_err(|e| format!("Failed to diff staged: {}", e))?;
-
-    if staged.deltas().count() > 0 {
-        return extract_file_diff(&staged, file_path);
-    }
-
-    // Fall back to unstaged
-    opts.include_untracked(true);
-    opts.recurse_untracked_dirs(true);
-    opts.show_untracked_content(true);
-    let unstaged = repo
-        .diff_index_to_workdir(None, Some(&mut opts))
-        .map_err(|e| format!("Failed to diff workdir: {}", e))?;
-
-    extract_file_diff(&unstaged, file_path)
+    let tree = resolve_tree(repo, effective_ref)?;
+    file_base_to_workdir(repo, &tree, file_path, diff_opts)
 }
 
 pub fn diff_local_vs_remote(repo: &Repository) -> Result<(Vec<FileSummary>, String, String), String> {
@@ -180,7 +243,7 @@ pub fn diff_local_vs_remote(repo: &Repository) -> Result<(Vec<FileSummary>, Stri
         .unwrap_or("unknown")
         .to_string();
 
-    let summaries = diff_branches(repo, &upstream_name, &branch_name)?;
+    let summaries = diff_branches(repo, &upstream_name, &branch_name, DiffOpts::default())?;
     Ok((summaries, upstream_name, branch_name))
 }
 
@@ -197,8 +260,7 @@ pub fn get_file_content(repo: &Repository, ref_name: &str, file_path: &str) -> R
     let blob = repo
         .find_blob(entry.id())
         .map_err(|e| format!("Failed to get blob: {}", e))?;
-    const MAX_FILE_SIZE: usize = 2 * 1024 * 1024; // 2 MB
-    if blob.is_binary() || blob.size() > MAX_FILE_SIZE {
+    if blob.is_binary() || blob.size() > MAX_FILE_SIZE_BYTES {
         return Ok(vec![]);
     }
     let content = std::str::from_utf8(blob.content())
@@ -212,22 +274,10 @@ fn resolve_tree<'a>(repo: &'a Repository, refname: &str) -> Result<git2::Tree<'a
         .map_err(|e| format!("Failed to resolve '{}': {}", refname, e))
 }
 
-fn create_tree_diff<'a>(
-    repo: &'a Repository,
-    from_ref: &str,
-    to_ref: &str,
-) -> Result<Diff<'a>, String> {
-    let from_tree = resolve_tree(repo, from_ref)?;
-    let to_tree = resolve_tree(repo, to_ref)?;
-
-    repo.diff_tree_to_tree(Some(&from_tree), Some(&to_tree), None)
-        .map_err(|e| format!("Failed to create diff: {}", e))
-}
-
 fn extract_file_summaries(diff: &Diff) -> Result<Vec<FileSummary>, String> {
-    let stats_list: Vec<_> = (0..diff.deltas().count())
-        .map(|i| {
-            let delta = diff.deltas().nth(i).unwrap();
+    let mut summaries: Vec<FileSummary> = diff
+        .deltas()
+        .map(|delta| {
             let path = delta
                 .new_file()
                 .path()
@@ -255,9 +305,6 @@ fn extract_file_summaries(diff: &Diff) -> Result<Vec<FileSummary>, String> {
             }
         })
         .collect();
-
-    // Get line stats via diff.stats()
-    let mut summaries = stats_list;
 
     // Use print to count per-file additions/deletions
     let mut file_idx: i32 = -1;

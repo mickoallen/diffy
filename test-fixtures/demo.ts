@@ -3,6 +3,7 @@ interface User {
   id: number;
   name: string;
   email?: string;
+  role: 'admin' | 'user';
 }
 
 function greet(user: User): string {
@@ -10,8 +11,9 @@ function greet(user: User): string {
 }
 
 const users: User[] = [
-  { id: 1, name: "Alice" },
-  { id: 2, name: "Bob", email: "bob@example.com" },
+  { id: 1, name: "Alice", role: "admin" },
+  { id: 2, name: "Bob", email: "bob@example.com", role: "user" },
+  { id: 3, name: "Charlie", email: "charlie@example.com", role: "user" },
 ];
 
 export { greet, users };

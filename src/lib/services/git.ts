@@ -75,26 +75,65 @@ export async function getCommitsBetween(
 export async function getDiffSummary(
 	path: string,
 	fromRef: string,
-	toRef: string
+	toRef: string,
+	ignoreWhitespace = false
 ): Promise<DiffSummary> {
-	return invoke('get_diff_summary', { path, fromRef, toRef });
+	return invoke('get_diff_summary', { path, fromRef, toRef, ignoreWhitespace });
 }
 
 export async function getFileDiff(
 	path: string,
 	fromRef: string,
 	toRef: string,
-	filePath: string
+	filePath: string,
+	ignoreWhitespace = false
 ): Promise<FileDiff> {
-	return invoke('get_file_diff', { path, fromRef, toRef, filePath });
+	return invoke('get_file_diff', { path, fromRef, toRef, filePath, ignoreWhitespace });
 }
 
-export async function getWorkdirSummary(path: string): Promise<DiffSummary> {
-	return invoke('get_workdir_summary', { path });
+export async function getWorkdirSummary(
+	path: string,
+	ignoreWhitespace = false
+): Promise<DiffSummary> {
+	return invoke('get_workdir_summary', { path, ignoreWhitespace });
 }
 
-export async function getWorkdirFileDiff(path: string, filePath: string): Promise<FileDiff> {
-	return invoke('get_workdir_file_diff', { path, filePath });
+export async function getWorkdirFileDiff(
+	path: string,
+	filePath: string,
+	ignoreWhitespace = false
+): Promise<FileDiff> {
+	return invoke('get_workdir_file_diff', { path, filePath, ignoreWhitespace });
+}
+
+export async function getStagedSummary(
+	path: string,
+	ignoreWhitespace = false
+): Promise<DiffSummary> {
+	return invoke('get_staged_summary', { path, ignoreWhitespace });
+}
+
+export async function getStagedFileDiff(
+	path: string,
+	filePath: string,
+	ignoreWhitespace = false
+): Promise<FileDiff> {
+	return invoke('get_staged_file_diff', { path, filePath, ignoreWhitespace });
+}
+
+export async function getUnstagedSummary(
+	path: string,
+	ignoreWhitespace = false
+): Promise<DiffSummary> {
+	return invoke('get_unstaged_summary', { path, ignoreWhitespace });
+}
+
+export async function getUnstagedFileDiff(
+	path: string,
+	filePath: string,
+	ignoreWhitespace = false
+): Promise<FileDiff> {
+	return invoke('get_unstaged_file_diff', { path, filePath, ignoreWhitespace });
 }
 
 export async function getLocalVsRemote(
@@ -111,16 +150,21 @@ export async function getDefaultBranch(path: string): Promise<string> {
 	return invoke('get_default_branch', { path });
 }
 
-export async function getBranchToWorkdirSummary(path: string, baseRef: string): Promise<DiffSummary> {
-	return invoke('get_branch_to_workdir_summary', { path, baseRef });
+export async function getBranchToWorkdirSummary(
+	path: string,
+	baseRef: string,
+	ignoreWhitespace = false
+): Promise<DiffSummary> {
+	return invoke('get_branch_to_workdir_summary', { path, baseRef, ignoreWhitespace });
 }
 
 export async function getBranchToWorkdirFileDiff(
 	path: string,
 	baseRef: string,
-	filePath: string
+	filePath: string,
+	ignoreWhitespace = false
 ): Promise<FileDiff> {
-	return invoke('get_branch_to_workdir_file_diff', { path, baseRef, filePath });
+	return invoke('get_branch_to_workdir_file_diff', { path, baseRef, filePath, ignoreWhitespace });
 }
 
 export async function listRepoFiles(path: string): Promise<string[]> {

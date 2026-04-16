@@ -2,6 +2,11 @@
 	import { onMount } from 'svelte';
 	import { settingsStore, type Theme, type Font, type Scale, type AiProvider } from '$lib/stores/settings.svelte';
 	import { listAiModels, testAiConnection } from '$lib/services/ai';
+	import { focusTrap } from '$lib/utils/focusTrap';
+
+	function closeModal() {
+		settingsStore.showSettings = false;
+	}
 
 	const themes: { value: Theme; label: string; dark: boolean }[] = [
 		{ value: 'void', label: 'Void', dark: true },
@@ -95,13 +100,24 @@
 	});
 </script>
 
-<!-- svelte-ignore a11y_click_events_have_key_events -->
-<div class="overlay" onclick={() => (settingsStore.showSettings = false)} role="presentation">
-		<!-- svelte-ignore a11y_interactive_supports_focus -->
-		<div class="modal" onclick={(e) => e.stopPropagation()} role="dialog" aria-label="Settings">
+<div
+	class="overlay"
+	onclick={(e) => {
+		if (e.target === e.currentTarget) closeModal();
+	}}
+	role="presentation"
+>
+		<div
+			class="modal"
+			role="dialog"
+			aria-modal="true"
+			aria-labelledby="settings-title"
+			tabindex="-1"
+			{@attach focusTrap({ onEscape: closeModal })}
+		>
 			<div class="modal-header">
-				<h2>Settings</h2>
-				<button class="close" onclick={() => (settingsStore.showSettings = false)}>×</button>
+				<h2 id="settings-title">Settings</h2>
+				<button class="close" aria-label="Close settings" onclick={closeModal}>×</button>
 			</div>
 
 			<div class="setting-group">
@@ -202,7 +218,7 @@
 						/>
 						<datalist id="ai-model-list">
 							{#each models as m}
-								<option value={m} />
+								<option value={m}></option>
 							{/each}
 						</datalist>
 					{/if}
