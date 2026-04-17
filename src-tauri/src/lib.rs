@@ -44,6 +44,7 @@ pub fn run() {
             diff_cmds::get_branch_to_workdir_file_diff,
             diff_cmds::get_local_vs_remote,
             diff_cmds::get_file_content,
+            diff_cmds::get_file_bytes,
             // AI commands
             ai_cmds::ai_summarize,
             ai_cmds::ai_flag_issues,

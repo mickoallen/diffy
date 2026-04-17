@@ -7,10 +7,12 @@
 	import UnifiedDiff from './UnifiedDiff.svelte';
 	import SplitDiff from './SplitDiff.svelte';
 	import FullFileDiff from './FullFileDiff.svelte';
+	import ImageDiff from './ImageDiff.svelte';
 	import SearchBar from './SearchBar.svelte';
 	import { marked } from 'marked';
 	import { convertFileSrc } from '@tauri-apps/api/core';
 	import { highlightLines } from '$lib/utils/highlighter';
+	import { isImageFile } from '$lib/utils/fileType';
 
 	function handleExplainHunk(content: string) {
 		settingsStore.showAiPanel = true;
@@ -29,6 +31,12 @@
 	);
 
 	let isMdFile = $derived(currentFilePath?.endsWith('.md') ?? false);
+	let isImage = $derived(isImageFile(currentFilePath));
+	let imageSrc = $derived(
+		diffStore.treeMode === 'all' && diffStore.selectedRepoFile
+			? convertFileSrc(repoStore.path + '/' + diffStore.selectedRepoFile)
+			: ''
+	);
 
 	let allFilesHighlighted = $state<string[]>([]);
 
@@ -99,7 +107,11 @@
 					</div>
 				{/if}
 			</div>
-			{#if showMarkdown && mdContent !== null}
+			{#if isImage}
+				<div class="image-frame">
+					<img src={imageSrc} alt={diffStore.selectedRepoFile ?? ''} />
+				</div>
+			{:else if showMarkdown && mdContent !== null}
 				<div class="markdown-body">{@html mdContent}</div>
 			{:else}
 				<div class="file-content">
@@ -115,20 +127,24 @@
 			{/if}
 		</div>
 	{:else if diffStore.fileDiff}
-		{#if isMdFile}
-			<div class="md-toggle-bar">
-				<button class:active={!showMarkdown} onclick={() => { showMarkdown = false; }}>Raw</button>
-				<button class:active={showMarkdown} onclick={enableMarkdown}>Rendered</button>
-			</div>
-		{/if}
-		{#if showMarkdown && mdContent !== null}
-			<div class="markdown-body">{@html mdContent}</div>
-		{:else if diffStore.viewMode === 'unified'}
-			<UnifiedDiff file={diffStore.fileDiff} onExplainHunk={handleExplainHunk} />
-		{:else if diffStore.viewMode === 'split'}
-			<SplitDiff file={diffStore.fileDiff} onExplainHunk={handleExplainHunk} />
+		{#if isImage}
+			<ImageDiff file={diffStore.fileDiff} />
 		{:else}
-			<FullFileDiff file={diffStore.fileDiff} />
+			{#if isMdFile}
+				<div class="md-toggle-bar">
+					<button class:active={!showMarkdown} onclick={() => { showMarkdown = false; }}>Raw</button>
+					<button class:active={showMarkdown} onclick={enableMarkdown}>Rendered</button>
+				</div>
+			{/if}
+			{#if showMarkdown && mdContent !== null}
+				<div class="markdown-body">{@html mdContent}</div>
+			{:else if diffStore.viewMode === 'unified'}
+				<UnifiedDiff file={diffStore.fileDiff} onExplainHunk={handleExplainHunk} />
+			{:else if diffStore.viewMode === 'split'}
+				<SplitDiff file={diffStore.fileDiff} onExplainHunk={handleExplainHunk} />
+			{:else}
+				<FullFileDiff file={diffStore.fileDiff} />
+			{/if}
 		{/if}
 	{:else if diffStore.error}
 		<div class="error">
@@ -232,6 +248,26 @@
 		flex: 1;
 		font-family: var(--font-mono);
 		font-size: 0.929rem;
+	}
+	.image-frame {
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		padding: 24px;
+		background-color: var(--bg-secondary);
+		background-image:
+			linear-gradient(45deg, var(--border) 25%, transparent 25%),
+			linear-gradient(-45deg, var(--border) 25%, transparent 25%),
+			linear-gradient(45deg, transparent 75%, var(--border) 75%),
+			linear-gradient(-45deg, transparent 75%, var(--border) 75%);
+		background-size: 16px 16px;
+		background-position: 0 0, 0 8px, 8px -8px, -8px 0;
+		border-radius: 6px;
+	}
+	.image-frame img {
+		max-width: 100%;
+		max-height: 80vh;
+		object-fit: contain;
 	}
 	.line {
 		display: flex;

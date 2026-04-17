@@ -3,6 +3,10 @@ use git2::{Delta, Diff, DiffOptions, Repository};
 /// Max file size (bytes) read from a blob for full-file views. Anything larger is treated as binary.
 pub const MAX_FILE_SIZE_BYTES: usize = 2 * 1024 * 1024;
 
+/// Cap for binary asset reads (images). Larger than the text limit because images
+/// are commonly a few MB; rejecting at this threshold avoids ballooning IPC payloads.
+pub const MAX_BINARY_BYTES: usize = 16 * 1024 * 1024;
+
 use super::types::*;
 
 fn delta_to_status(delta: Delta) -> FileStatus {
@@ -245,6 +249,29 @@ pub fn diff_local_vs_remote(repo: &Repository) -> Result<(Vec<FileSummary>, Stri
 
     let summaries = diff_branches(repo, &upstream_name, &branch_name, DiffOpts::default())?;
     Ok((summaries, upstream_name, branch_name))
+}
+
+pub fn get_file_bytes_at_ref(
+    repo: &Repository,
+    ref_name: &str,
+    file_path: &str,
+) -> Result<Vec<u8>, String> {
+    let obj = repo
+        .revparse_single(ref_name)
+        .map_err(|e| format!("Failed to resolve '{}': {}", ref_name, e))?;
+    let tree = obj
+        .peel_to_tree()
+        .map_err(|e| format!("Failed to peel to tree: {}", e))?;
+    let entry = tree
+        .get_path(std::path::Path::new(file_path))
+        .map_err(|_| format!("File '{}' not found at '{}'", file_path, ref_name))?;
+    let blob = repo
+        .find_blob(entry.id())
+        .map_err(|e| format!("Failed to get blob: {}", e))?;
+    if blob.size() > MAX_BINARY_BYTES {
+        return Err(format!("file too large: {} bytes", blob.size()));
+    }
+    Ok(blob.content().to_vec())
 }
 
 pub fn get_file_content(repo: &Repository, ref_name: &str, file_path: &str) -> Result<Vec<String>, String> {

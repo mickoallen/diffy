@@ -14,7 +14,7 @@ pub struct AssetScopeState {
 /// Canonicalise `root` and `root.join(rel)` (or canonicalise `root` alone if `rel` is empty),
 /// and verify the resolved path stays inside the canonical root. Rejects path traversal
 /// and symlinks that escape the repo.
-fn resolve_within(root: &str, rel: &str) -> Result<PathBuf, String> {
+pub(crate) fn resolve_within(root: &str, rel: &str) -> Result<PathBuf, String> {
     let canonical_root = std::fs::canonicalize(root)
         .map_err(|e| format!("Failed to resolve repository root: {}", e))?;
 

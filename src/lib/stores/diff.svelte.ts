@@ -12,6 +12,7 @@ import {
 	type FileDiff,
 	type FileSummary
 } from '$lib/services/git';
+import { isImageFile } from '$lib/utils/fileType';
 import { repoStore } from './repo.svelte';
 import { repoPrefsStore } from './repoPrefs.svelte';
 
@@ -232,7 +233,10 @@ class DiffStore {
 		this.fileDiff = null;
 		this.fileLoading = true;
 		try {
-			this.fullFileContent = await readRepoFile(repoStore.path, filePath);
+			// Image files are rendered directly in the view; no text content needed.
+			this.fullFileContent = isImageFile(filePath)
+				? ''
+				: await readRepoFile(repoStore.path, filePath);
 		} catch (e) {
 			this.error = String(e);
 		} finally {

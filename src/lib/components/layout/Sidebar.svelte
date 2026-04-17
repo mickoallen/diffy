@@ -4,6 +4,7 @@
 	import { reviewedStore } from '$lib/stores/reviewed.svelte';
 	import { repoPrefsStore } from '$lib/stores/repoPrefs.svelte';
 	import type { FileSummary } from '$lib/services/git';
+	import { getFileCategory } from '$lib/utils/fileType';
 
 	const statusIcon: Record<string, string> = {
 		Added: 'A',
@@ -205,6 +206,7 @@
 				{#if node.file}
 					<!-- File node -->
 					{@const diffFile = diffFileMap.get(node.path)}
+					{@const category = getFileCategory(node.path)}
 					<div
 						class="file-row"
 						class:selected={isSelected(node)}
@@ -221,7 +223,8 @@
 							{:else}
 								<span class="status-placeholder"></span>
 							{/if}
-							<span class="name">{node.name}</span>
+							<span class="filetype-dot filetype-{category}" aria-hidden="true"></span>
+							<span class="name {diffFile ? statusClass[diffFile.status] : ''}">{node.name}</span>
 							{#if diffFile}
 								{#if diffFile.is_binary}
 									<span class="binary-badge">BIN</span>
@@ -490,6 +493,24 @@
 	.status.renamed {
 		color: var(--color-rename);
 	}
+	.filetype-dot {
+		width: 8px;
+		height: 8px;
+		border-radius: 2px;
+		flex-shrink: 0;
+		background: var(--color-filetype-other);
+	}
+	.filetype-dot.filetype-script { background: var(--color-filetype-script); }
+	.filetype-dot.filetype-style { background: var(--color-filetype-style); }
+	.filetype-dot.filetype-markup { background: var(--color-filetype-markup); }
+	.filetype-dot.filetype-config { background: var(--color-filetype-config); }
+	.filetype-dot.filetype-data { background: var(--color-filetype-data); }
+	.filetype-dot.filetype-image { background: var(--color-filetype-image); }
+	.filetype-dot.filetype-doc { background: var(--color-filetype-doc); }
+	.name.added { color: var(--color-add); }
+	.name.deleted { color: var(--color-del); }
+	.name.modified { color: var(--color-mod); }
+	.name.renamed { color: var(--color-rename); }
 	.name {
 		flex: 1;
 		overflow: hidden;

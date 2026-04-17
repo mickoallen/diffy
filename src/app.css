@@ -22,6 +22,14 @@
 	--diff-del-badge: #da3633;
 	--diff-mod-badge: #9e6a03;
 	--diff-rename-badge: #8b5cf6;
+	--color-filetype-script: #60a5fa;
+	--color-filetype-style: #ec4899;
+	--color-filetype-markup: #22d3ee;
+	--color-filetype-config: #94a3b8;
+	--color-filetype-data: #14b8a6;
+	--color-filetype-image: #eab308;
+	--color-filetype-doc: #a3a3a3;
+	--color-filetype-other: var(--text-muted);
 }
 
 [data-theme='abyss'] {
@@ -45,6 +53,14 @@
 	--diff-del-badge: #da3633;
 	--diff-mod-badge: #9e6a03;
 	--diff-rename-badge: #8b5cf6;
+	--color-filetype-script: #5b9bff;
+	--color-filetype-style: #e06b9e;
+	--color-filetype-markup: #3bc8d9;
+	--color-filetype-config: #808080;
+	--color-filetype-data: #4dd0b5;
+	--color-filetype-image: #d4a935;
+	--color-filetype-doc: #a0a0a0;
+	--color-filetype-other: var(--text-muted);
 }
 
 [data-theme='chalk'],
@@ -69,6 +85,14 @@
 	--diff-del-badge: #cf222e;
 	--diff-mod-badge: #9a6700;
 	--diff-rename-badge: #8250df;
+	--color-filetype-script: #2563eb;
+	--color-filetype-style: #db2777;
+	--color-filetype-markup: #0891b2;
+	--color-filetype-config: #64748b;
+	--color-filetype-data: #0d9488;
+	--color-filetype-image: #ca8a04;
+	--color-filetype-doc: #525252;
+	--color-filetype-other: var(--text-muted);
 }
 
 [data-theme='nate'] {
@@ -92,6 +116,14 @@
 	--diff-del-badge: #b01414;
 	--diff-mod-badge: #8a5c00;
 	--diff-rename-badge: #5030a8;
+	--color-filetype-script: #1e4d80;
+	--color-filetype-style: #a03a6b;
+	--color-filetype-markup: #0e6e7a;
+	--color-filetype-config: #8a7f72;
+	--color-filetype-data: #5a6b20;
+	--color-filetype-image: #9a5020;
+	--color-filetype-doc: #6b6258;
+	--color-filetype-other: var(--text-muted);
 }
 
 /* Font variables */

@@ -182,3 +182,17 @@ export async function getFileContent(
 ): Promise<string[]> {
 	return invoke('get_file_content', { path, refName, filePath });
 }
+
+export interface FileBytes {
+	base64: string;
+	mime: string;
+}
+
+/** Fetch raw bytes of a file. Pass an empty `refName` to read the working copy. */
+export async function getFileBytes(
+	path: string,
+	refName: string,
+	filePath: string
+): Promise<FileBytes> {
+	return invoke('get_file_bytes', { path, refName, filePath });
+}

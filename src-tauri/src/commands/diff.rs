@@ -1,6 +1,34 @@
 use crate::commands::git_blocking;
+use crate::commands::git::resolve_within;
 use crate::git::{diff, repo as git_repo, types::*};
+use base64::{engine::general_purpose::STANDARD, Engine as _};
 use diff::DiffOpts;
+
+#[derive(serde::Serialize)]
+pub struct FileBytes {
+    pub base64: String,
+    pub mime: String,
+}
+
+fn mime_from_path(path: &str) -> String {
+    let ext = std::path::Path::new(path)
+        .extension()
+        .and_then(|e| e.to_str())
+        .unwrap_or("")
+        .to_ascii_lowercase();
+    match ext.as_str() {
+        "png" => "image/png",
+        "jpg" | "jpeg" => "image/jpeg",
+        "gif" => "image/gif",
+        "webp" => "image/webp",
+        "svg" => "image/svg+xml",
+        "bmp" => "image/bmp",
+        "ico" => "image/x-icon",
+        "avif" => "image/avif",
+        _ => "application/octet-stream",
+    }
+    .to_string()
+}
 
 fn opts(ignore_whitespace: bool) -> DiffOpts {
     DiffOpts { ignore_whitespace }
@@ -153,6 +181,37 @@ pub async fn get_file_content(path: String, ref_name: String, file_path: String)
     git_blocking(move || {
         let repository = git_repo::open_repo(&path)?;
         diff::get_file_content(&repository, &ref_name, &file_path)
+    })
+    .await
+}
+
+/// Returns the raw bytes of a file as base64. If `ref_name` is empty, reads the working
+/// copy from disk; otherwise resolves the file from a git tree at that ref.
+#[tauri::command]
+pub async fn get_file_bytes(
+    path: String,
+    ref_name: String,
+    file_path: String,
+) -> Result<FileBytes, String> {
+    git_blocking(move || {
+        let mime = mime_from_path(&file_path);
+        let bytes = if ref_name.is_empty() {
+            let full = resolve_within(&path, &file_path)?;
+            let len = std::fs::metadata(&full)
+                .map_err(|e| e.to_string())?
+                .len() as usize;
+            if len > diff::MAX_BINARY_BYTES {
+                return Err(format!("file too large: {} bytes", len));
+            }
+            std::fs::read(&full).map_err(|e| e.to_string())?
+        } else {
+            let repository = git_repo::open_repo(&path)?;
+            diff::get_file_bytes_at_ref(&repository, &ref_name, &file_path)?
+        };
+        Ok(FileBytes {
+            base64: STANDARD.encode(bytes),
+            mime,
+        })
     })
     .await
 }
